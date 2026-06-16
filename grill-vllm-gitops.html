@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vLLM GitOps Control Plane — 설계 보고서</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', -apple-system, sans-serif;
+    background: #0b1120;
+    color: #e2e8f0;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, #0f172a 0%, #0b1120 100%);
+    border-bottom: 1px solid #1e293b;
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  header .brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  header .logo {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, #818cf8, #38bdf8);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    color: #0f172a;
+  }
+
+  header h1 {
+    font-size: 17px;
+    font-weight: 600;
+    color: #f1f5f9;
+    line-height: 1.3;
+  }
+
+  header h1 small {
+    font-size: 13px;
+    font-weight: 400;
+    color: #64748b;
+    display: block;
+  }
+
+  header .meta {
+    text-align: right;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  header .meta strong {
+    color: #94a3b8;
+  }
+
+  /* ── Main ── */
+  main {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .page-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .page {
+    flex: 0 0 100%;
+    height: 100%;
+    overflow-y: auto;
+    padding: 36px 48px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page::-webkit-scrollbar { width: 6px; }
+  .page::-webkit-scrollbar-track { background: transparent; }
+  .page::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  .page::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+  /* ── Page Header ── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 24px;
+    flex-shrink: 0;
+  }
+
+  .page-num {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    flex-shrink: 0;
+  }
+
+  .page-section {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f1f5f9;
+    margin-left: auto;
+  }
+
+  /* ── Content ── */
+  .content {
+    flex: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .content h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #e2e8f0;
+    margin: 28px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #1e293b;
+  }
+
+  .content h2:first-child {
+    margin-top: 0;
+  }
+
+  .content h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #a5b4fc;
+    margin: 20px 0 10px;
+  }
+
+  .content p {
+    font-size: 15px;
+    line-height: 1.8;
+    color: #cbd5e1;
+    margin-bottom: 12px;
+  }
+
+  .content p strong {
+    color: #f1f5f9;
+  }
+
+  .content p .hl {
+    color: #7dd3fc;
+    font-weight: 500;
+  }
+
+  .content ul, .content ol {
+    margin: 8px 0 16px 20px;
+    line-height: 1.8;
+  }
+
+  .content li {
+    font-size: 15px;
+    color: #cbd5e1;
+    margin-bottom: 4px;
+  }
+
+  .content li strong {
+    color: #f1f5f9;
+  }
+
+  /* ── Tags / Badges ── */
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 5px;
+    margin-right: 4px;
+    letter-spacing: 0.03em;
+  }
+  .tag.p0 { background: #10b981; color: #022c22; }
+  .tag.p1 { background: #3b82f6; color: #0c1929; }
+  .tag.p2 { background: #f59e0b; color: #292524; }
+  .tag.p3 { background: #64748b; color: #0f172a; }
+  .tag.ok { background: #065f46; color: #6ee7b7; }
+  .tag.no { background: #7f1d1d; color: #fca5a5; }
+
+  /* ── Card Grid ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0;
+  }
+
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+
+  .card .key {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+
+  .card .val {
+    font-size: 14px;
+    color: #e2e8f0;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .card .val.sm { font-size: 13px; }
+
+  /* ── Tables ── */
+  .content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 14px;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .content table thead {
+    background: #1e293b;
+  }
+
+  .content table th {
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    color: #94a3b8;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #334155;
+  }
+
+  .content table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #1e293b;
+    color: #cbd5e1;
+    vertical-align: top;
+  }
+
+  .content table td:first-child {
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+    width: 1%;
+  }
+
+  .content table tr:hover td {
+    background: rgba(30, 41, 59, 0.5);
+  }
+
+  /* ── Code ── */
+  .content pre {
+    background: #0a0f1a;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    padding: 18px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #e2e8f0;
+    overflow-x: auto;
+    margin: 14px 0;
+  }
+
+  .content pre .kw { color: #818cf8; }
+  .content pre .cm { color: #64748b; }
+  .content pre .str { color: #7dd3fc; }
+  .content pre .var { color: #fbbf24; }
+  .content pre .op { color: #f472b6; }
+
+  .content code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: #1e293b;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #e2e8f0;
+  }
+
+  .content pre code {
+    background: none;
+    padding: 0;
+  }
+
+  /* ── Architecture Diagram ── */
+  .arch {
+    background: #0a0f1a;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 24px;
+    margin: 14px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre;
+    overflow-x: auto;
+    color: #94a3b8;
+  }
+
+  .arch .box   { color: #f1f5f9; }
+  .arch .line  { color: #475569; }
+  .arch .arrow { color: #818cf8; }
+  .arch .label { color: #7dd3fc; }
+  .arch .hl    { color: #a5b4fc; }
+
+  /* ── Workflow Steps ── */
+  .steps {
+    margin: 14px 0;
+    counter-reset: step;
+  }
+
+  .step {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .step-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border: 1px solid #334155;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #818cf8;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .step-text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #cbd5e1;
+    padding-top: 3px;
+  }
+
+  .step-text strong {
+    color: #e2e8f0;
+  }
+
+  .step-text .tool {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    background: #1e293b;
+    padding: 1px 8px;
+    border-radius: 4px;
+    color: #7dd3fc;
+    margin: 0 2px;
+  }
+
+  /* ── Decision Box ── */
+  .decision-box {
+    background: linear-gradient(135deg, #0a1e1a, #0d281f);
+    border: 1px solid #1a473a;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin: 14px 0;
+    position: relative;
+  }
+
+  .decision-box .title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6ee7b7;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+
+  .decision-box .text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #a7f3d0;
+  }
+
+  /* ── Navigation ── */
+  nav {
+    background: #0f172a;
+    border-top: 1px solid #1e293b;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    gap: 16px;
+  }
+
+  nav .info {
+    font-size: 13px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  nav .info strong {
+    color: #94a3b8;
+  }
+
+  nav .center {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .dots {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #334155;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .dot:hover { background: #475569; }
+  .dot.active {
+    background: #818cf8;
+    box-shadow: 0 0 8px rgba(129, 140, 248, 0.5);
+    width: 9px;
+    height: 9px;
+  }
+
+  .dot.section-start {
+    margin-left: 6px;
+  }
+  .dot.section-start::before {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    width: 2px;
+    height: 12px;
+    background: #475569;
+    transform: translateY(-50%);
+  }
+
+  nav .btn-group {
+    display: flex;
+    gap: 6px;
+  }
+
+  nav button {
+    background: #1e293b;
+    border: 1px solid #334155;
+    color: #e2e8f0;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    padding: 7px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+
+  nav button:hover:not(:disabled) {
+    background: #334155;
+    border-color: #475569;
+  }
+
+  nav button:disabled {
+    opacity: 0.25;
+    cursor: default;
+  }
+
+  nav button .arrow {
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .page { padding: 20px 16px 16px; }
+    .card-grid { grid-template-columns: 1fr; }
+    header { flex-direction: column; align-items: flex-start; gap: 6px; }
+    header .meta { text-align: left; }
+    nav { flex-direction: column; gap: 10px; }
+    nav .center { width: 100%; justify-content: space-between; }
+    .page-title { font-size: 18px; }
+    .arch { font-size: 10px; padding: 14px; }
+  }
+
+  @media (max-width: 480px) {
+    .dots { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">G</div>
+    <div>
+      <h1>vLLM GitOps Control Plane <small>설계 보고서</small></h1>
+    </div>
+  </div>
+  <div class="meta">
+    <strong>2026-06-16</strong><br>
+    /grill-me 세션 · v1.0
+  </div>
+</header>
+
+<main>
+  <div class="page-container" id="pages"></div>
+</main>
+
+<nav>
+  <div class="center">
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="info">
+    <span id="pageLabel">—</span>
+  </div>
+  <div class="btn-group">
+    <button id="prevBtn" disabled><span class="arrow">◀</span> 이전</button>
+    <button id="nextBtn">다음 <span class="arrow">▶</span></button>
+  </div>
+</nav>
+
+<script>
+// ────────────────────────────────────────────────────────
+// Pages Data
+// ────────────────────────────────────────────────────────
+const S = { icon: n => n, html: s => s };
+
+const pages = [
+  // ── Page 1: Cover ──
+  {
+    title: '서론',
+    section: '배경',
+    body: `
+      <h2>1. 배경 및 목표</h2>
+
+      <h3>1.1 현재 상황</h3>
+      <div class="card-grid">
+        <div class="card"><div class="key">하드웨어</div><div class="val sm">Dell R740xd, NVIDIA A100 80GB PCIe × 2장</div></div>
+        <div class="card"><div class="key">GPU 연결</div><div class="val sm">PCIe 4.0 ×16 <strong style="color:#f87171;">(NVLink 없음)</strong></div></div>
+        <div class="card"><div class="key">현재 LLM 런타임</div><div class="val sm">Ollama (호스트 직접 설치, 단일 사용자)</div></div>
+        <div class="card"><div class="key">vLLM 경험</div><div class="val sm" style="color:#f87171;">없음</div></div>
+        <div class="card"><div class="key">실험 기록</div><div class="val sm" style="color:#f87171;">없음</div></div>
+        <div class="card"><div class="key">재현성</div><div class="val sm" style="color:#f87171;">없음 (호스트 직접 설치, Git 미사용)</div></div>
+      </div>
+
+      <h3>1.2 네트워크 환경</h3>
+      <ul>
+        <li>서버: <strong>Private Air-gapped Network</strong> (외부 인터넷 직접 접근 불가)</li>
+        <li><strong>GitHub Enterprise Server (GHE)</strong> — 내부망에서 Git 접근 가능</li>
+        <li><strong>Nexus Repository</strong> — Docker 이미지 프록시 (NVIDIA Registry 미러링)</li>
+        <li><strong>Hugging Face Mirror</strong> — 내부망에서 모델 다운로드 가능</li>
+      </ul>
+
+      <h3>1.3 최종 목표</h3>
+      <div class="decision-box">
+        <div class="title">목표</div>
+        <div class="text">NVIDIA A100 80GB × 2 장에서 vLLM으로 <strong>10명 동시 서빙</strong> 최적 조건을 탐색하는 <strong>Git-first 컨테이너 실험 환경</strong> 구축</div>
+      </div>
+
+      <h3>1.4 핵심 제약</h3>
+      <ul>
+        <li><strong>GPU 간 NVLink 없음</strong> → Tensor Parallelism(TP2)은 PCIe 병목으로 비효율적</li>
+        <li><strong>Air-gap</strong> → 외부 서비스 직접 접근 불가, 내부 미러 경유 필수</li>
+        <li><strong>SSH 접속을 완전히 제거</strong>하여 Git-first 워크플로우 강제</li>
+      </ul>
+    `
+  },
+
+  // ── Page 2: GPU Strategy ──
+  {
+    title: 'GPU 사용 전략',
+    section: '아키텍처',
+    body: `
+      <h2>2. GPU 사용 전략</h2>
+
+      <h3>2.1 GPU 점유 정책</h3>
+      <table>
+        <thead><tr><th>항목</th><th>결정</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr><td>GPU 점유</td><td><strong>하이브리드</strong></td><td>GPU당 독립 실행, 필요 시 전체 요청 가능</td></tr>
+          <tr><td>GPU 사용 방식</td><td><strong>독립 실행</strong></td><td>NVLink 없음 → TP2는 PCIe 병목으로 비추천</td></tr>
+          <tr><td>Dev/Ops 분리</td><td><strong>code-server:</strong> GPU 불필요<br><strong>vLLM dev:</strong> GPU0<br><strong>vLLM ops:</strong> GPU1 (Dev 미사용 시 GPU0도 사용)</td><td>GPU 경합 회피 + 자원 활용률 극대화</td></tr>
+        </tbody>
+      </table>
+
+      <h3>2.2 GPU 할당 테이블</h3>
+      <table>
+        <thead><tr><th>시나리오</th><th>Dev (GPU0)</th><th>Ops (GPU1)</th><th>Ops (GPU0 추가)</th></tr></thead>
+        <tbody>
+          <tr><td>Dev 실행 중, Ops 운영 중</td><td>vLLM dev 점유</td><td>vLLM ops 점유</td><td style="color:#64748b;">미사용</td></tr>
+          <tr><td>Dev 종료, Ops 운영 중</td><td style="color:#6ee7b7;">free</td><td>vLLM ops 점유</td><td style="color:#7dd3fc;">Ops 추가 확보</td></tr>
+          <tr><td>Dev만 실행 중</td><td>vLLM dev 점유</td><td style="color:#64748b;">free</td><td style="color:#64748b;">free</td></tr>
+        </tbody>
+      </table>
+
+      <h3>2.3 GPU 선택 의사결정</h3>
+      <div class="card-grid">
+        <div class="card"><div class="key">질문</div><div class="val sm">NVLink 없이 TP2를 쓸 수 있나?</div><div class="val" style="color:#f87171;">불가 (PCIe 병목, 32GB/s vs NVLink 600GB/s)</div></div>
+        <div class="card"><div class="key">질문</div><div class="val sm">Ops GPU는 고정인가?</div><div class="val" style="color:#7dd3fc;">GPU1 고정. Dev 미사용 시 GPU0 추가</div></div>
+        <div class="card"><div class="key">질문</div><div class="val sm">GPU 점유 정책은?</div><div class="val" style="color:#7dd3fc;">하이브리드</div></div>
+        <div class="card"><div class="key">질문</div><div class="val sm">code-server에 GPU 필요한가?</div><div class="val" style="color:#6ee7b7;">불필요 (CPU/RAM만 사용)</div></div>
+      </div>
+    `
+  },
+
+  // ── Page 3: Architecture ──
+  {
+    title: '아키텍처',
+    section: '설계',
+    body: `
+      <h2>3. Git-first Control Plane 아키텍처</h2>
+
+      <h3>3.1 구성 요소</h3>
+      <table>
+        <thead><tr><th style="width:110px;">레이어</th><th style="width:120px;">도구</th><th>역할</th><th>설치 방식</th></tr></thead>
+        <tbody>
+          <tr><td>웹 IDE</td><td><strong>code-server</strong></td><td>브라우저에서 run.sh 편집, git commit/push</td><td><code>docker run codercom/code-server</code></td></tr>
+          <tr><td>GitOps 엔진</td><td><strong>Dockhand</strong></td><td>Webhook 수신 → 자동 git pull → docker compose up</td><td><code>docker run dockhand/dockhand</code></td></tr>
+          <tr><td>Git 저장소</td><td><strong>GHE</strong> (기존)</td><td>Git remote, webhook 발신</td><td>기존 인프라</td></tr>
+          <tr><td>Docker 이미지</td><td><strong>Nexus</strong> (기존)</td><td>Docker Registry Proxy (NVIDIA → 내부)</td><td>기존 인프라</td></tr>
+          <tr><td>모델 다운로드</td><td><strong>HF Mirror</strong> (기존)</td><td>Hugging Face 모델 내부 캐시</td><td>기존 인프라</td></tr>
+          <tr><td>컨테이너 런타임</td><td><strong>Docker Engine</strong></td><td>GPU 컨테이너 실행</td><td>호스트 기본 설치</td></tr>
+        </tbody>
+      </table>
+
+      <h3>3.2 아키텍처 다이어그램</h3>
+      <div class="arch">┌───────────────── R740xd (Air-gap Network) ──────────────────┐
+│                                                                │
+│  ┌──────────────────────────────────────────────────────┐      │
+│  │  <span class="box">Docker Engine</span>                                        │      │
+│  │                                                       │      │
+│  │  ┌────────────────┐  ┌────────────┐  ┌──────────────┐│      │
+│  │  │ <span class="label">code-server</span>    │  │ <span class="label">Dockhand</span>  │  │ <span class="label">vLLM (ops)</span>  ││      │
+│  │  │  (웹 IDE)        │  │ (GitOps)   │  │ (10명 서빙)  ││      │
+│  │  │                 │  │            │  │              ││      │
+│  │  │  run.sh 편집    │  │ webhook    │  │ <span class="hl">GPU1 (+GPU0)</span>││      │
+│  │  │  git commit     │  │ 수신       │  │ compose up   ││      │
+│  │  │  git push       │  │ git pull   │  │              ││      │
+│  │  └───────┬────────┘  └─────┬──────┘  └──────────────┘│      │
+│  │          │                 │                           │      │
+│  └──────────┼─────────────────┼───────────────────────────┘      │
+│             │                 │                                    │
+│             ▼                 ▼                                    │
+│      ┌──────────┐    ┌────────────┐  ┌──────────────┐             │
+│      │ <span class="hl">GHE</span>      │    │ <span class="hl">Nexus</span>      │  │ <span class="hl">HF Mirror</span>   │             │
+│      │ (Git)     │    │ (이미지     │  │ (모델 캐시)   │             │
+│      │ webhook   │    │  프록시)   │  │              │             │
+│      └──────────┘    └────────────┘  └──────────────┘             │
+│                                                                │
+└────────────────────────────────────────────────────────────────┘</div>
+
+      <h3>3.3 데이터 흐름</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><strong>개발자</strong>가 브라우저로 <span class="tool">code-server</span> 접속</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><span class="tool">code-server</span> 에서 <code>run.sh</code> 수정 → <code>git commit + push</code></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><span class="tool">GHE</span> 가 <span class="tool">Dockhand</span> 로 webhook 전송</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><span class="tool">Dockhand</span> 가 자동으로 <code>git pull</code> 실행</div></div>
+        <div class="step"><div class="step-num">5</div><div class="step-text"><span class="tool">Dockhand</span> 가 <code>docker compose up</code> 실행</div></div>
+        <div class="step"><div class="step-num">6</div><div class="step-text"><span class="tool">vLLM</span> 컨테이너가 GPU에서 서빙 시작</div></div>
+      </div>
+    `
+  },
+
+  // ── Page 4: Repository ──
+  {
+    title: 'Git 리포지토리 구조',
+    section: '설계',
+    body: `
+      <h2>4. Git 리포지토리 구조</h2>
+
+      <h3>4.1 최소 구조 <span class="tag p0">P0</span></h3>
+      <p>Git commit = 실험 스냅샷. <strong>파일 하나로 시작</strong>하고 복잡해지면 나중에 분리한다.</p>
+
+      <pre><code>vllm-experiments/
+├── run.sh              <span class="cm"># vLLM 실행 명령어 (전체 설정)</span>
+├── .env                <span class="cm"># HF_TOKEN 등 시크릿 (.gitignore)</span>
+└── .gitignore</code></pre>
+
+      <h3>4.2 run.sh 템플릿</h3>
+      <pre><code><span class="cm">#!/bin/bash</span>
+<span class="cm"># === 실험 설정 (여기만 바꿔서 commit) ===</span>
+<span class="kw">MODEL</span>=<span class="str">"meta-llama/Llama-3.1-8B-Instruct"</span>
+<span class="kw">TP_SIZE</span>=1
+<span class="kw">MAX_MODEL_LEN</span>=8192
+<span class="kw">GPU_MEM_UTIL</span>=0.90
+<span class="kw">DTYPE</span>=<span class="str">"bfloat16"</span>
+<span class="kw">VLLM_IMAGE</span>=<span class="str">"nexus.internal.com/vllm/vllm-openai:v0.7.1"</span>
+<span class="kw">GPU_DEVICES</span>=<span class="str">"device=0"</span>
+
+<span class="cm"># === vLLM 실행 ===</span>
+docker run --gpus <span class="var">$GPU_DEVICES</span> --rm <span class="op">\\</span>
+  -e HF_TOKEN=<span class="var">$HF_TOKEN</span> <span class="op">\\</span>
+  <span class="var">$VLLM_IMAGE</span> <span class="op">\\</span>
+  vllm serve <span class="var">$MODEL</span> <span class="op">\\</span>
+    --tensor-parallel-size <span class="var">$TP_SIZE</span> <span class="op">\\</span>
+    --max-model-len <span class="var">$MAX_MODEL_LEN</span> <span class="op">\\</span>
+    --gpu-memory-utilization <span class="var">$GPU_MEM_UTIL</span> <span class="op">\\</span>
+    --dtype <span class="var">$DTYPE</span></code></pre>
+
+      <h3>4.3 워크플로우</h3>
+      <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text"><span class="tool">vi run.sh</span> — 실험 파라미터 수정</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text"><span class="tool">git commit -am "Llama 8B tp1 len8k 실험"</span> — 실험 히스토리 기록</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text"><span class="tool">git push</span> — Dockhand가 자동으로 pull + 실행</div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-text"><span class="tool">git log</span> = 전체 실험 이력</div></div>
+      </div>
+
+      <div class="decision-box">
+        <div class="title">원칙</div>
+        <div class="text"><strong>나중에 필요해지면 그때 분리한다.</strong> Docker Compose, config.yaml 분리, Makefile 등은 지금 붙이지 않는다.</div>
+      </div>
+    `
+  },
+
+  // ── Page 5: Workflow ──
+  {
+    title: '워크플로우',
+    section: '운영',
+    body: `
+      <h2>5. 전체 워크플로우</h2>
+
+      <h3>5.1 일일 실험 워크플로우</h3>
+      <table>
+        <thead><tr><th style="width:36px;">#</th><th>작업</th><th style="width:140px;">도구</th><th style="width:100px;">SSH?</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>브라우저로 code-server 접속</td><td>Chrome → <code>:8443</code></td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>2</td><td>run.sh 수정 (모델, 파라미터 변경)</td><td>code-server VS Code UI</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>3</td><td>git commit + git push</td><td>code-server Git GUI</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>4</td><td>(자동) GHE webhook → Dockhand 수신</td><td>Dockhand</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>5</td><td>(자동) git pull + docker compose up</td><td>Dockhand</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>6</td><td>vLLM 로그 확인</td><td>code-server 터미널</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>7</td><td>실험 결과 기록 (수동)</td><td>code-server → README</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+          <tr><td>8</td><td>git commit (결과 기록)</td><td>code-server Git GUI</td><td style="color:#6ee7b7;">❌ 불필요</td></tr>
+        </tbody>
+      </table>
+
+      <h3>5.2 실험 전환 워크플로우</h3>
+      <div class="card-grid">
+        <div class="card">
+          <div class="key">Dev (GPU0) 실험 중</div>
+          <div class="val sm">code-server → run.sh 수정 → git push<br>→ Dockhand pull → GPU0 compose up<br>→ vLLM dev 재시작</div>
+        </div>
+        <div class="card">
+          <div class="key">Ops (GPU1) 운영 중</div>
+          <div class="val sm">항상 GPU1에서 10명 서빙 유지<br>Dev GPU0 사용 → Ops는 GPU1만<br>Dev GPU0 반납 → Ops가 GPU0 추가</div>
+        </div>
+      </div>
+
+      <h3>5.3 Git-first 강제 메커니즘</h3>
+      <div class="decision-box">
+        <div class="title">SSH 제거 = Git-first 강제</div>
+        <div class="text">
+          SSH가 없으면 <code style="color:#f87171;">"일단 급하면 SSH로"</code> 선택지가 사라진다.<br>
+          모든 변경은 <strong>Git을 통해서만</strong> 가능 → 자동으로 재현성 확보.<br>
+          code-server + Dockhand가 <strong>브라우저만으로</strong> 모든 작업을 가능하게 한다.
+        </div>
+      </div>
+    `
+  },
+
+  // ── Page 6: Decisions ──
+  {
+    title: '의사 결정 요약',
+    section: '결정',
+    body: `
+      <h2>6. 의사 결정 요약</h2>
+
+      <table>
+        <thead><tr><th style="width:56px;">#</th><th style="width:120px;">주제</th><th>결정 사항</th><th>근거</th></tr></thead>
+        <tbody>
+          <tr><td>D1</td><td>GPU 사용 방식</td><td><strong>독립 실행</strong> (TP2 안 함)</td><td>NVLink 없음, PCIe 병목</td></tr>
+          <tr><td>D2</td><td>GPU 점유 정책</td><td><strong>하이브리드</strong></td><td>기본 독립, 필요 시 전체 할당</td></tr>
+          <tr><td>D3</td><td>Ops GPU 전략</td><td>GPU1 고정, Dev 미사용 시 GPU0 추가</td><td>자원 활용률 + Dev 보호</td></tr>
+          <tr><td>D4</td><td>P0</td><td><strong>Git commit = 실험 설정</strong> (run.sh 단일)</td><td>가장 단순한 Git-first 시작점</td></tr>
+          <tr><td>D5</td><td>P1</td><td><strong>Docker 컨테이너 전용</strong></td><td>호스트 오염 방지, 버전 고정</td></tr>
+          <tr><td>D6</td><td>Git 서버</td><td><strong>GHE</strong> (기존 활용)</td><td>이미 내부망에 구축됨. Gitea 불필요</td></tr>
+          <tr><td>D7</td><td>컨테이너 관리</td><td><strong>Dockhand</strong> (GitOps 엔진)</td><td>Git-first 철학 내장, webhook 자동화</td></tr>
+          <tr><td>D8</td><td>웹 IDE</td><td><strong>code-server</strong></td><td>브라우저 VS Code, Git 내장</td></tr>
+          <tr><td>D9</td><td>SSH</td><td><strong>완전 제거 목표</strong></td><td>Git-first 강제, 편의성 향상</td></tr>
+          <tr><td>D10</td><td>모델 다운로드</td><td><strong>HF Mirror</strong> (기존)</td><td>Air-gap 문제 없음</td></tr>
+          <tr><td>D11</td><td>이미지 다운로드</td><td><strong>Nexus</strong> (기존)</td><td>NVIDIA Registry 프록시</td></tr>
+          <tr><td>D12</td><td>Metrics</td><td>Throughput, Latency, VRAM, 안정성 — <strong>수동</strong></td><td>자동화는 P3 이후</td></tr>
+        </tbody>
+      </table>
+
+      <h3>채택하지 않은 솔루션</h3>
+      <table>
+        <thead><tr><th>솔루션</th><th>배제 사유</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Gitea</strong></td><td>GHE가 이미 내부망 Git 서버로 존재. 불필요한 관리 대상 추가</td></tr>
+          <tr><td><strong>Portainer CE</strong></td><td>UI 버튼으로 Git 기록 없이 컨테이너 상태 변경 가능 → Git-first 철학 약화. Git Stack도 CE에선 유료</td></tr>
+          <tr><td><strong>ArgoCD</strong></td><td>Kubernetes 필수 → 단일 서버 R740xd에 오버스펙. 서버 증설 시 재검토</td></tr>
+        </tbody>
+      </table>
+    `
+  },
+
+  // ── Page 7: Roadmap ──
+  {
+    title: '로드맵',
+    section: '계획',
+    body: `
+      <h2>7. 우선순위 로드맵</h2>
+
+      <table>
+        <thead><tr><th style="width:56px;">순위</th><th style="width:150px;">기능</th><th>상태</th><th>설명</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="tag p0">P0</span></td>
+            <td>Git commit = 실험 설정</td>
+            <td style="color:#6ee7b7;"><strong>✅ 결정 완료</strong></td>
+            <td><code>run.sh</code> 단일 파일. <code>git log</code> = 전체 실험 이력. 지금 당장 시작 가능</td>
+          </tr>
+          <tr>
+            <td><span class="tag p1">P1</span></td>
+            <td>환경 재현성 (Docker)</td>
+            <td style="color:#6ee7b7;"><strong>✅ 결정 완료</strong></td>
+            <td><code>vllm/vllm-openai</code> 이미지, Nexus 경유. 호스트 오염 제로</td>
+          </tr>
+          <tr>
+            <td><span class="tag p2">P2</span></td>
+            <td>Git push = 자동 실행</td>
+            <td style="color:#6ee7b7;"><strong>✅ 결정 완료</strong></td>
+            <td>Dockhand + GHE webhook. git push → 자동 pull → compose up</td>
+          </tr>
+          <tr>
+            <td><span class="tag p3">P3</span></td>
+            <td>GPU 스케줄링</td>
+            <td style="color:#fbbf24;">🔲 미정</td>
+            <td>다중 사용자 환경 시 GPU 락/대기열. 현재는 하이브리드 정책으로 충분</td>
+          </tr>
+          <tr>
+            <td><span class="tag p3">P4</span></td>
+            <td>Metrics 자동 수집/시각화</td>
+            <td style="color:#fbbf24;">🔲 미정</td>
+            <td>수동 수집으로 시작. 실험 횟수가 늘어나면 검토</td>
+          </tr>
+          <tr>
+            <td><span class="tag p3">P5</span></td>
+            <td>K8s + ArgoCD 전환</td>
+            <td style="color:#fbbf24;">🔲 미정</td>
+            <td>서버 규모가 커지거나 다중 노드가 되면 검토</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>SSH 완전 제거 조건</h3>
+      <p>SSH 없이 모든 작업이 가능하려면 서버에 <strong>단 1회 초기 설치</strong>가 필요합니다:</p>
+
+      <pre><code><span class="cm"># 1. Docker Engine (설치되어 있다고 가정)</span>
+
+<span class="cm"># 2. code-server</span>
+docker run -d --name code-server <span class="op">\\</span>
+  -p 8443:8080 <span class="op">\\</span>
+  -v /home/<span class="var">$USER</span>/vllm-experiments:/home/coder/project <span class="op">\\</span>
+  codercom/code-server:latest
+
+<span class="cm"># 3. Dockhand</span>
+docker run -d --name dockhand <span class="op">\\</span>
+  -p 9001:9001 <span class="op">\\</span>
+  -v /home/<span class="var">$USER</span>/vllm-experiments:/repo <span class="op">\\</span>
+  -v /var/run/docker.sock:/var/run/docker.sock <span class="op">\\</span>
+  dockhand/dockhand</code></pre>
+
+      <div class="decision-box">
+        <div class="title">설치 후 GHE Webhook 등록</div>
+        <div class="text">
+          URL: <code>http://server:9001/hooks/vllm-push</code><br>
+          Trigger: Push events<br>
+          이후 모든 작업은 브라우저(code-server)에서만 수행. SSH 재접속 불필요.
+        </div>
+      </div>
+    `
+  },
+
+  // ── Page 8: Summary ──
+  {
+    title: '최종 요약',
+    section: '종합',
+    body: `
+      <h2>8. 최종 요약</h2>
+
+      <div class="card-grid">
+        <div class="card"><div class="key">GPU 점유 정책</div><div class="val" style="color:#34d399;">하이브리드</div></div>
+        <div class="card"><div class="key">GPU 사용 방식</div><div class="val" style="color:#34d399;">독립 실행 (NVLink 없음)</div></div>
+        <div class="card"><div class="key">P0 — 실험 히스토리</div><div class="val" style="color:#34d399;">Git commit = run.sh</div></div>
+        <div class="card"><div class="key">P1 — 환경 재현성</div><div class="val" style="color:#34d399;">Docker 컨테이너 전용</div></div>
+        <div class="card"><div class="key">Git 서버</div><div class="val" style="color:#34d399;">GHE (기존)</div></div>
+        <div class="card"><div class="key">GitOps 엔진</div><div class="val" style="color:#34d399;">Dockhand</div></div>
+        <div class="card"><div class="key">웹 IDE</div><div class="val" style="color:#34d399;">code-server</div></div>
+        <div class="card"><div class="key">SSH</div><div class="val" style="color:#f87171;">완전 제거</div></div>
+        <div class="card"><div class="key">이미지 프록시</div><div class="val" style="color:#34d399;">Nexus (기존)</div></div>
+        <div class="card"><div class="key">모델 캐시</div><div class="val" style="color:#34d399;">HF Mirror (기존)</div></div>
+        <div class="card"><div class="key">Metrics</div><div class="val" style="color:#34d399;">Throughput / Latency / VRAM / 안정성 — 수동</div></div>
+        <div class="card"><div class="key">채택 안 함</div><div class="val" style="color:#94a3b8;">Portainer, Gitea, ArgoCD</div></div>
+      </div>
+
+      <h3>최종 아키텍처 (요약)</h3>
+      <div class="arch">┌─────────────────────────────────────────────────────────┐
+│                    <span class="box">R740xd (Air-gap)</span>                     │
+│                                                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │
+│  │ <span class="label">code-server</span>  │  │ <span class="label">Dockhand</span>    │  │ <span class="hl">vLLM (ops)</span>      │ │
+│  │  (웹 IDE)      │  │  (GitOps)    │  │  (10명 서빙)    │ │
+│  │               │  │              │  │  GPU1 (+GPU0)   │ │
+│  │  run.sh 편집  │  │  webhook 수신│  │  compose up     │ │
+│  │  git push     │  │  git pull    │  │                 │ │
+│  └───────┬───────┘  └──────┬───────┘  └─────────────────┘ │
+│          │                 │                               │
+│          ▼                 ▼                               │
+│    ┌──────────┐    ┌────────────┐  ┌──────────────┐       │
+│    │ <span class="hl">GHE</span>       │    │ <span class="hl">Nexus</span>      │  │ <span class="hl">HF Mirror</span>   │       │
+│    │ (Git)     │    │ (이미지)    │  │ (모델 캐시)   │       │
+│    └──────────┘    └────────────┘  └──────────────┘       │
+│                                                           │
+└───────────────────────────────────────────────────────────┘</div>
+
+      <div class="decision-box" style="margin-top:20px;">
+        <div class="title">핵심 메시지</div>
+        <div class="text">
+          <strong>SSH는 단 한 번 — 최초 설치 때만.</strong><br><br>
+          그 다음부터는 브라우저로 모든 작업:<br>
+          code-server에서 <code>run.sh</code> 수정 → <code>git push</code> →<br>
+          Dockhand가 자동으로 pull + 실행.<br><br>
+          <strong>Git을 우회할 수 없음 = 자동으로 재현성 확보.</strong>
+        </div>
+      </div>
+    `
+  }
+];
+
+// ────────────────────────────────────────────────────────
+// Render
+// ────────────────────────────────────────────────────────
+const container = document.getElementById('pages');
+const dotsContainer = document.getElementById('dots');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const pageLabel = document.getElementById('pageLabel');
+
+pages.forEach((p, i) => {
+  const div = document.createElement('div');
+  div.className = 'page';
+
+  const sectionFirst = i === 0 || pages[i-1].section !== p.section;
+
+  div.innerHTML = `
+    <div class="page-header">
+      <div class="page-num">${i + 1}</div>
+      <span class="page-section">${p.section}</span>
+      <span class="page-title">${p.title}</span>
+    </div>
+    <div class="content">${p.body}</div>
+  `;
+
+  container.appendChild(div);
+});
+
+// Dots
+pages.forEach((_, i) => {
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', `Go to page ${i + 1}`);
+  dot.addEventListener('click', () => goTo(i));
+  dotsContainer.appendChild(dot);
+});
+
+let current = 0;
+
+function goTo(i) {
+  if (i < 0 || i >= pages.length) return;
+  current = i;
+  container.style.transform = `translateX(-${current * 100}%)`;
+  prevBtn.disabled = current === 0;
+  nextBtn.disabled = current === pages.length - 1;
+  pageLabel.textContent = `${current + 1} / ${pages.length} · ${pages[current].title}`;
+
+  document.querySelectorAll('.dot').forEach((d, idx) => {
+    d.className = 'dot' + (idx === current ? ' active' : '');
+  });
+}
+
+prevBtn.addEventListener('click', () => goTo(current - 1));
+nextBtn.addEventListener('click', () => goTo(current + 1));
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault();
+    if (current < pages.length - 1) goTo(current + 1);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (current > 0) goTo(current - 1);
+  }
+});
+
+// Start
+goTo(0);
+</script>
+
+</body>
+</html>

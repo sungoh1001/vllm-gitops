@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vLLM GitOps 설계 — 채팅 로그 2026-06-16</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', -apple-system, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-bottom: 1px solid #334155;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    background: linear-gradient(90deg, #818cf8, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .meta {
+    font-size: 13px;
+    color: #94a3b8;
+  }
+
+  /* ── Main ── */
+  main {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .page-container {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .page {
+    flex: 0 0 100%;
+    height: 100%;
+    overflow-y: auto;
+    padding: 40px 48px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .page::-webkit-scrollbar { width: 6px; }
+  .page::-webkit-scrollbar-track { background: transparent; }
+  .page::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+  /* ── Page Header ── */
+  .page-number {
+    font-size: 13px;
+    font-weight: 500;
+    color: #64748b;
+    letter-spacing: 0.05em;
+    margin-bottom: 20px;
+    flex-shrink: 0;
+  }
+
+  /* ── Questions ── */
+  .qa-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .question {
+    background: linear-gradient(135deg, #1e293b, #1a2332);
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+  }
+
+  .question::before {
+    content: "Q";
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: #818cf8;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 6px;
+  }
+
+  .question .label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #818cf8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  .question .text {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #f1f5f9;
+  }
+
+  .question .text strong {
+    color: #a5b4fc;
+  }
+
+  .answer {
+    background: linear-gradient(135deg, #0f1a2e, #14203a);
+    border: 1px solid #1e3a5f;
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+    margin-left: 24px;
+  }
+
+  .answer::before {
+    content: "A";
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: #38bdf8;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 6px;
+  }
+
+  .answer .label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #38bdf8;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  .answer .text {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #cbd5e1;
+  }
+
+  .answer .text strong {
+    color: #7dd3fc;
+  }
+
+  /* ── Decision Box ── */
+  .decision {
+    background: linear-gradient(135deg, #0a1e1a, #0d281f);
+    border: 1px solid #1a473a;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-left: 36px;
+    position: relative;
+  }
+
+  .decision::before {
+    content: "✓ 결정";
+    position: absolute;
+    top: -10px;
+    left: 16px;
+    background: #10b981;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 6px;
+  }
+
+  .decision .text {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #6ee7b7;
+  }
+
+  .decision table {
+    margin-top: 10px;
+    border-collapse: collapse;
+    font-size: 13px;
+    width: 100%;
+  }
+
+  .decision td {
+    padding: 4px 12px 4px 0;
+    vertical-align: top;
+    color: #a7f3d0;
+  }
+
+  .decision td:first-child {
+    color: #6ee7b7;
+    font-weight: 600;
+    white-space: nowrap;
+    width: 1%;
+  }
+
+  /* ── Code ── */
+  pre {
+    background: #0a0f1a;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #e2e8f0;
+    overflow-x: auto;
+    margin: 12px 0 0 0;
+  }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: #1e293b;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #f1f5f9;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+  }
+
+  /* ── Final Summary ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .summary-item {
+    background: #1e293b;
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+
+  .summary-item .key {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+
+  .summary-item .val {
+    font-size: 14px;
+    color: #e2e8f0;
+    font-weight: 500;
+  }
+
+  .summary-item .val.ok { color: #34d399; }
+  .summary-item .val.no { color: #f87171; }
+
+  /* ── Navigation ── */
+  nav {
+    background: #1e293b;
+    border-top: 1px solid #334155;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+
+  nav .info {
+    font-size: 14px;
+    color: #94a3b8;
+  }
+
+  nav .info strong {
+    color: #e2e8f0;
+  }
+
+  nav .btn-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  nav button {
+    background: #334155;
+    border: none;
+    color: #e2e8f0;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  nav button:hover:not(:disabled) { background: #475569; }
+  nav button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  nav button .arrow {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  /* ── Progress dots ── */
+  .dots {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #475569;
+    transition: all 0.2s;
+    cursor: pointer;
+    border: none;
+    padding: 0;
+  }
+
+  .dot.active {
+    background: #818cf8;
+    box-shadow: 0 0 6px rgba(129, 140, 248, 0.5);
+    width: 10px;
+    height: 10px;
+  }
+
+  .dot.done {
+    background: #334155;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .page { padding: 24px 16px 16px; }
+    .answer { margin-left: 12px; }
+    .decision { margin-left: 20px; }
+    .summary-grid { grid-template-columns: 1fr; }
+    header { flex-direction: column; align-items: flex-start; gap: 4px; }
+    nav { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📋 vLLM GitOps 설계 — 채팅 로그</h1>
+  <span class="meta">2026-06-16 · /grill-me 세션</span>
+</header>
+
+<main>
+  <div class="page-container" id="pages">
+    <!-- pages will be rendered by JS -->
+  </div>
+</main>
+
+<nav>
+  <div class="dots" id="dots"></div>
+  <div class="info">
+    <span id="pageLabel">1 / 16</span>
+  </div>
+  <div class="btn-group">
+    <button id="prevBtn" disabled>
+      <span class="arrow">◀</span> 이전
+    </button>
+    <button id="nextBtn">
+      다음 <span class="arrow">▶</span>
+    </button>
+  </div>
+</nav>
+
+<script>
+// ──────────────────────────────────────────────
+// Data — 각 페이지 = Q&A 쌍 + 선택적 결정 박스
+// ──────────────────────────────────────────────
+const pages = [
+  {
+    number: 1,
+    summary: "배경 및 현황",
+    q: '현재 Shadow IT 인프라는 어떤 형태로 운영되고 있나요?<br><br>예를 들어: 개발자가 직접 VM/컨테이너를 띄우는 수준? 어떤 클라우드/온프레미스 환경? 현재 통제가 안 되어서 생기는 구체적인 문제는 무엇인가요? (보안, 비용 폭발, 설정 드리프트 등)',
+    a: '<strong>nvidia a100 pcie 2장이 설치된 서버에서 vllm 10명 서빙을 최종 목적으로 하는 local llm 최적 서빙 조건 vllm 실험을 git first 컨테이너 방식으로 실행하고 싶음.</strong>'
+  },
+  {
+    number: 2,
+    summary: "현재 실행 방식",
+    q: '지금 vLLM 실험을 어떻게 실행하고 계신가요?<br><br>SSH로 서버에 직접 접속해서 python이나 docker run으로 띄우고 계신가요? 실험 파라미터를 바꿀 때마다 수동으로 재실행하나요? Git에 실험 설정을 남기고 있다면 어느 수준까지 되어 있나요?',
+    a: '지금은 <strong>vllm 아니라 단일 사용자 ollama 방식</strong>으로 실행했었음. vllm 경험 없음. <strong>실험 결과 기록 없고</strong> 호스트에 직접 설치해서 <strong>재현성 확보되지 않고</strong> 있음. 호스트 shell 명령어를 <strong>git 기록하지 못하고</strong> 있음.',
+    decision: 'vLLM 경험 없음. 호스트 직접 설치. Git 미사용. 재현성 없음. → Git-first 전환 필요.'
+  },
+  {
+    number: 3,
+    summary: "실험 주기 및 운영 시간",
+    q: 'vLLM 실험의 변경 주기와 운영 시간을 어떻게 예상하시나요?<br><br><strong>(A)</strong> 실험 세션 단위 — 하루에 여러 번 파라미터 변경, 컨테이너 생성/삭제<br><strong>(B)</strong> 지속 서빙 단위 — 설정 한 번 잡고 며칠~몇 주<br><strong>(C)</strong> 둘 다<br><br>제 추천: (A)로 시작해서 (C)로 확장.',
+    a: '<strong>C</strong> — 둘 다.',
+    decision: '<table><tr><td>운영 모드</td><td>실험 + 운영 모두 Git-first Control Plane으로 커버</td></tr></table>'
+  },
+  {
+    number: 4,
+    summary: "실험 성공 기준 (Metrics)",
+    q: '실험의 성공 기준(metric)을 어떻게 정의하시나요?<br><br><strong>(a)</strong> Throughput (requests/sec)<br><strong>(b)</strong> Latency P50/P95/P99<br><strong>(c)</strong> VRAM 효율<br><strong>(d)</strong> TTFT (Time-to-First-Token)<br><strong>(e)</strong> 안정성 (OOM/크래시 없이 버티는 시간)<br><br>자동 수집이 필요한가요? 제 추천: TTFT + Throughput + VRAM 자동 수집.',
+    a: '<strong>a b c e</strong> (Throughput, Latency, VRAM, 안정성). <strong>자동 수집은 필요없음.</strong>',
+    decision: '<table><tr><td>Metrics</td><td>Throughput, Latency (P50/P95/P99), VRAM 효율, 안정성</td></tr><tr><td>수집 방식</td><td>수동</td></tr></table>'
+  },
+  {
+    number: 5,
+    summary: "멀티테넌시 & GPU 사용 방식",
+    q: '서버의 멀티테넌시 상황은 어떻게 되나요?<br><br><strong>(a)</strong> 독점 사용 — 내가 단독 사용<br><strong>(b)</strong> 공유 사용 — 다른 사람과 GPU 경합<br><strong>(c)</strong> 혼합<br><br>그리고 A100 2장을 TP2로 합칠지, 독립 실행할지?',
+    a: '<strong>b. a100 80gb pcie 2장 설치됨.</strong><br><br>(NVLink 없음 확인) → PCIe 4.0 ×16, NVLink 없음. <strong>TP2는 PCIe 병목으로 비효율.</strong>',
+    decision: '<table><tr><td>GPU 점유 정책</td><td>하이브리드 — 기본 독립, 필요 시 전체 요청</td></tr><tr><td>GPU 사용 방식</td><td>독립 실행 (NVLink 없음 → TP2 불가)</td></tr><tr><td>하드웨어</td><td>Dell R740xd, A100 80GB PCIe ×2</td></tr></table>'
+  },
+  {
+    number: 6,
+    summary: "MVP 우선순위",
+    q: 'Git-first Control Plane의 MVP 범위를 좁히겠습니다. 가장 높은 우선순위는?<br><br><strong>(a)</strong> Git push = vLLM 실행<br><strong>(b)</strong> 환경 재현성 (Docker)<br><strong>(c)</strong> GPU 스케줄링<br><strong>(d)</strong> 실험 히스토리 (Git 커밋)<br><br>제 추천: (b) → (a) → (d) → (c)',
+    a: '<strong>d -- b -- a</strong>',
+    decision: `<table><tr><td><strong>P0</strong></td><td>실험 히스토리 — Git 커밋 = 실험 설정</td></tr><tr><td><strong>P1</strong></td><td>환경 재현성 — Docker 컨테이너</td></tr><tr><td><strong>P2</strong></td><td>Git push → 자동 실행</td></tr><tr><td>P3</td><td>GPU 스케줄링 (나중에)</td></tr></table>`
+  },
+  {
+    number: 7,
+    summary: "Git 리포지토리 구조",
+    q: 'Git commit 하나가 "하나의 실험 상태"를 기록합니다. 어떤 파일들이 들어가야 할까요?<br><br>제 추천 초기 구조:<br><pre><code>vllm-experiments/<br>├── run.sh<br>├── docker-compose.yml<br>├── README.md<br>└── .gitignore</code></pre><br>어떤가요? 더 간단한 구조가 필요하신가요?',
+    a: '<strong>더 간단한 추천 구조가 있나요?</strong>',
+    recommendation: `<strong>run.sh 하나면 충분합니다.</strong><br><br>Git commit = 실험 스냅샷. 나머지는 없다.<br><br><pre><code>vllm-experiments/<br>└── run.sh          # 이 파일 하나</code></pre><br><br>워크플로우:<br><pre><code>vi run.sh                          # 파라미터 수정<br>git commit -am "Llama 8B tp2 실험"  # 기록<br>./run.sh                           # 실행</code></pre>`,
+    decision: '<table><tr><td>P0 구조</td><td>run.sh 단일 파일. Git commit = 실험 설정</td></tr></table>'
+  },
+  {
+    number: 8,
+    summary: "환경 재현성 (P1)",
+    q: 'P1 — 환경 재현성. vLLM을 어떻게 설치/실행할까요?<br><br><strong>(a)</strong> 호스트 직접 설치 (pip install vllm)<br><strong>(b)</strong> Docker 컨테이너 전용 (vllm/vllm-openai 이미지) — <strong>추천</strong><br><br>HF_TOKEN은 어떻게 관리할까요?<br><strong>(a)</strong> 환경변수 주입 <strong>(b)</strong> .env + .gitignore — <strong>추천</strong> <strong>(c)</strong> secret manager',
+    a: '<strong>b</strong> / 모르겟음.',
+    decision: '<table><tr><td>vLLM 실행</td><td>Docker 컨테이너 전용 (vllm/vllm-openai)</td></tr><tr><td>HF_TOKEN</td><td>.env + .gitignore (추후 고민)</td></tr></table>'
+  },
+  {
+    number: 9,
+    summary: "Git 서버 결정 — Gitea vs GHE",
+    q: 'Git 서버 Gitea가 왜 필요한가요?<br><br>서버가 private air-gapped network에서 실행되고, GitHub은 private repo 사용 중입니다. 외부 GitHub은 mirror 방식, NVIDIA 이미지는 Nexus로 mirror 접속해야 합니다.<br><br>GHE가 내부망에 있나요?',
+    a: '<strong>ghe 있음</strong> (GitHub Enterprise Server).',
+    decision: '<table><tr><td>Git 서버</td><td>GHE (기존) — Gitea 불필요</td></tr><tr><td>Docker Registry</td><td>Nexus (기존)</td></tr><tr><td>HF 모델</td><td>HF Mirror (기존)</td></tr></table>'
+  },
+  {
+    number: 10,
+    summary: "웹 IDE + 컨테이너 워크플로우",
+    q: '개발 PC를 별도로 두지 않고, 서버에서 개발 컨테이너를 웹 접속해서 실행하고 git push 하고 서버의 운영 컨테이너로 서빙 실행할 수 있나요?<br><br>code-server 아시나요? Portainer에서 code-server를 실행할 수 있나요?',
+    a: '<strong>code-server 알아요.</strong><br><br>code-server: GPU 불필요. vLLM (dev): GPU0. vLLM (ops): GPU0 또는 GPU1.',
+    decision: `<table><tr><td>웹 IDE</td><td>code-server (GPU 불필요)</td></tr><tr><td>Dev GPU</td><td>GPU0</td></tr><tr><td>Ops GPU</td><td>GPU1 (Dev 미사용 시 GPU0도 추가)</td></tr></table>`
+  },
+  {
+    number: 11,
+    summary: "SSH 제거와 Git-first의 관계",
+    q: 'SSH 제거의 목적이 작업 편의성과 재현성 확보와 어떤 점인가요?',
+    a: 'SSH는 Git을 우회하는 지름길을 항상 열어둡니다.<br><br>"일단 급하면 SSH로" → Git 기록 누락 → 재현성 붕괴<br><br>SSH 제거 = Git-first를 강제하는 가장 단순한 방법. 의지력이나 규율이 아닌, 인프라 레벨에서 "Git을 우회할 수 없음"을 보장합니다.<br><br>편의성 측면에서도 code-server + Portainer가 SSH보다 우월: 브라우저만 있음, GUI Git, 버튼 클릭 재시작.',
+    decision: '<table><tr><td>SSH 정책</td><td>완전 제거 목표. 최초 설치 후 SSH 불필요</td></tr></table>'
+  },
+  {
+    number: 12,
+    summary: "Dockhand 채택",
+    q: 'code-server + Portainer 조합과 code-server + Dockhand 조합을 SSH 제거 측면에서 비교해주세요.',
+    a: '<strong>Shadow IT 관점에서는 오히려 Dockhand가 더 GitOps에 가깝습니다.</strong><br><br>개발자 → git push → Dockhand → webhook → 자동 git pull → docker compose up. 가능합니다.<br><br>Portainer의 약점: UI 버튼이 Git 기록 없이 컨테이너 상태 변경 가능 → Git-first 약화.<br>Dockhand는 Git을 통해서만 상태 변경 → Git-first 강제.',
+    decision: '<table><tr><td>GitOps 엔진</td><td><strong>Dockhand</strong> (Git-first 철학 내장, webhook 자동화 내장)</td></tr><tr><td>채택 안 함</td><td>Portainer CE (Git-first 약함), ArgoCD (K8s 오버스펙)</td></tr></table>'
+  },
+  {
+    number: 13,
+    summary: "Air-gap 인프라 완성",
+    q: 'Air-gap 환경의 모든 의존성이 해결되었습니다. 전체 인프라를 요약합니다.',
+    a: `<strong>모든 인프라 퍼즐이 맞춰졌습니다.</strong><br><br>
+    <table style="width:100%; border-collapse:collapse; font-size:14px; margin-top:8px;">
+      <tr style="border-bottom:1px solid #334155;">
+        <td style="padding:6px 12px 6px 0; font-weight:600; color:#a5b4fc;">외부 GitHub</td>
+        <td style="padding:6px 0; color:#e2e8f0;">→ GHE (내부 Git 서버)</td>
+      </tr>
+      <tr style="border-bottom:1px solid #334155;">
+        <td style="padding:6px 12px 6px 0; font-weight:600; color:#a5b4fc;">NVIDIA Registry</td>
+        <td style="padding:6px 0; color:#e2e8f0;">→ Nexus (Docker Proxy)</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 12px 6px 0; font-weight:600; color:#a5b4fc;">Hugging Face</td>
+        <td style="padding:6px 0; color:#e2e8f0;">→ HF Mirror (모델 캐시)</td>
+      </tr>
+    </table>`,
+    decision: '<table><tr><td>Git</td><td>GHE (mirror from GitHub.com)</td></tr><tr><td>Docker Images</td><td>Nexus (mirror from NVIDIA)</td></tr><tr><td>HF Models</td><td>HF Mirror</td></tr></table>'
+  },
+  {
+    number: 14,
+    summary: "Ops GPU 확정",
+    q: 'Ops 모드 GPU 선택 전략을 확정해주세요.<br><br><strong>(a)</strong> GPU1 고정<br><strong>(b)</strong> Dev 안 쓰면 GPU0도 사용<br><strong>(c)</strong> Dev 종료 후 GPU0 반납',
+    a: '<strong>ops 모드는 dev 안쓰면 gpu0 도 사용한다.</strong>',
+    decision: `<table><tr><td>Dev 실행 중</td><td>GPU0 점유, Ops = GPU1</td></tr><tr><td>Dev 종료</td><td>Ops = GPU1 + GPU0 추가 확보</td></tr></table>`
+  },
+  {
+    number: 15,
+    summary: "최종 결정 요약",
+    q: '<strong>모든 결정이 완료되었습니다. 전체 요약입니다.</strong>',
+    a: `<div class="summary-grid" style="margin-top:0;">
+      <div class="summary-item">
+        <div class="key">GPU 점유 정책</div>
+        <div class="val ok">하이브리드</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">GPU 사용 방식</div>
+        <div class="val ok">독립 실행 (NVLink 없음)</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">P0</div>
+        <div class="val ok">Git commit = run.sh</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">P1</div>
+        <div class="val ok">Docker 컨테이너 전용</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">Git 서버</div>
+        <div class="val ok">GHE (기존)</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">GitOps 엔진</div>
+        <div class="val ok">Dockhand</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">웹 IDE</div>
+        <div class="val ok">code-server</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">SSH</div>
+        <div class="val no">완전 제거</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">이미지 프록시</div>
+        <div class="val ok">Nexus (기존)</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">모델 캐시</div>
+        <div class="val ok">HF Mirror (기존)</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">Metrics</div>
+        <div class="val ok">Throughput / Latency / VRAM / 안정성</div>
+      </div>
+      <div class="summary-item">
+        <div class="key">채택 안 함</div>
+        <div class="val no">Portainer, Gitea, ArgoCD</div>
+      </div>
+    </div>`
+  },
+  {
+    number: 16,
+    summary: "최종 아키텍처",
+    q: '<strong>최종 Git-first Control Plane 아키텍처</strong>',
+    a: `<pre style="font-size:12px; line-height:1.5;"><code>┌──────────── R740xd (Air-gap) ─────────────────┐
+│                                                │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
+│  │code-server│  │ Dockhand  │  │ vLLM (ops)   │  │
+│  │ (웹 IDE)  │  │ (GitOps)  │  │ (10명 서빙)  │  │
+│  │           │  │          │  │              │  │
+│  │ run.sh    │  │ webhook  │  │ GPU1 (+GPU0) │  │
+│  │ git push  │  │ git pull │  │ compose up   │  │
+│  └─────┬─────┘  └────┬─────┘  └──────────────┘  │
+│        │             │                          │
+└────────┼─────────────┼──────────────────────────┘
+         │             │
+         ▼             ▼
+  ┌──────────┐  ┌──────────┐  ┌──────────┐
+  │   GHE    │  │  Nexus   │  │HF Mirror  │
+  │ (Git)    │  │ (이미지)  │  │ (모델)    │
+  └──────────┘  └──────────┘  └──────────┘</code></pre><br>
+    <strong style="color:#a5b4fc;">워크플로우:</strong><br><br>
+    브라우저 → code-server → run.sh 수정 → git commit/push<br>
+    → GHE webhook → Dockhand → 자동 git pull + compose up<br>
+    → vLLM 서빙 시작 (GPU1)<br><br>
+    <strong style="color:#7dd3fc;">SSH는 단 한 번 — 최초 설치 때만 필요합니다.</strong>`
+  }
+];
+
+// ──────────────────────────────────────────────
+// Render
+// ──────────────────────────────────────────────
+const container = document.getElementById('pages');
+const dotsContainer = document.getElementById('dots');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const pageLabel = document.getElementById('pageLabel');
+
+let current = 0;
+
+function renderPage(index) {
+  const p = pages[index];
+  const div = document.createElement('div');
+  div.className = 'page';
+
+  let html = `<div class="page-number">PAGE ${p.number} · ${p.summary}</div>`;
+  html += `<div class="qa-block">`;
+  html += `<div class="question"><div class="label">Question</div><div class="text">${p.q}</div></div>`;
+  html += `<div class="answer"><div class="label">Answer</div><div class="text">${p.a}</div></div>`;
+
+  if (p.recommendation) {
+    html += `<div class="decision"><div class="text">💡 ${p.recommendation}</div></div>`;
+  }
+
+  if (p.decision) {
+    html += `<div class="decision"><div class="text">${p.decision}</div></div>`;
+  }
+
+  html += `</div>`;
+  div.innerHTML = html;
+  container.appendChild(div);
+}
+
+// Render all pages
+pages.forEach((_, i) => renderPage(i));
+
+// Dots
+pages.forEach((_, i) => {
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.addEventListener('click', () => goTo(i));
+  dotsContainer.appendChild(dot);
+});
+
+function goTo(i) {
+  if (i < 0 || i >= pages.length) return;
+  current = i;
+  container.style.transform = `translateX(-${current * 100}%)`;
+  prevBtn.disabled = current === 0;
+  nextBtn.disabled = current === pages.length - 1;
+  pageLabel.textContent = `${current + 1} / ${pages.length}`;
+
+  document.querySelectorAll('.dot').forEach((d, idx) => {
+    d.className = 'dot' + (idx === current ? ' active' : idx < current ? ' done' : '');
+  });
+}
+
+prevBtn.addEventListener('click', () => goTo(current - 1));
+nextBtn.addEventListener('click', () => goTo(current + 1));
+
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') {
+    e.preventDefault();
+    if (current < pages.length - 1) goTo(current + 1);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    if (current > 0) goTo(current - 1);
+  }
+});
+
+// Start
+goTo(0);
+</script>
+
+</body>
+</html>
