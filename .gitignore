@@ -1,0 +1,10 @@
+# Claude Code internal files
+.agents/
+skills-lock.json
+
+# Environment secrets
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
