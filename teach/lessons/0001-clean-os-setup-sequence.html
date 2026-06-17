@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 0001 — Clean OS 이후 작업 순서</title>
+<style>
+  :root {
+    --text: #1a1a1a;
+    --muted: #555;
+    --bg: #fefefe;
+    --accent: #2b5f8a;
+    --warn: #c4422e;
+    --line: #e0e0e0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Noto Serif KR", "Source Han Serif KR", Georgia, serif;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 6rem;
+    font-size: 17px;
+  }
+  h1, h2, h3 { font-family: "Noto Sans KR", "Source Han Sans KR", -apple-system, sans-serif; }
+  h1 { font-size: 2.2rem; margin-bottom: 0.3rem; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 1.3rem; margin: 2.5rem 0 0.8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); font-weight: 600; }
+  h3 { font-size: 1.0rem; margin: 1.5rem 0 0.4rem; font-weight: 600; }
+  p { margin: 0.7rem 0; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  .state-box {
+    background: #f5f7f9; border-left: 4px solid var(--accent);
+    padding: 1rem 1.2rem; margin: 1.5rem 0; font-size: 0.95rem;
+  }
+  .state-box .label { font-weight: 700; color: var(--accent); display: block; margin-bottom: 0.3rem; }
+  .state-box code { background: #e8ecf0; padding: 0.1em 0.3em; border-radius: 3px; font-size: 0.9em; }
+
+  ol.steps {
+    counter-reset: step;
+    list-style: none;
+    margin: 1.5rem 0;
+  }
+  ol.steps > li {
+    counter-increment: step;
+    padding: 1rem 1rem 1rem 3.5rem;
+    margin: 0.8rem 0;
+    position: relative;
+    border-left: 3px solid var(--line);
+  }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0.5rem;
+    top: 1rem;
+    width: 2rem; height: 2rem;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 2rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    font-family: "Noto Sans KR", sans-serif;
+  }
+  ol.steps > li strong { display: block; margin-bottom: 0.25rem; font-size: 1.05rem; }
+
+  pre {
+    background: #1e1e1e; color: #d4d4d4;
+    padding: 1rem 1.2rem; margin: 0.8rem 0;
+    border-radius: 4px; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+    font-family: "JetBrains Mono", "D2Coding", "Consolas", monospace;
+  }
+  pre code { background: transparent; padding: 0; }
+  code { background: #f0f0f0; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.9em; }
+  pre .prompt { color: #6a9955; }
+  pre .cmd { color: #dcdcaa; }
+  pre .arg { color: #ce9178; }
+
+  .quiz { margin: 2rem 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: 6px; }
+  .quiz h3 { margin-top: 0; border: none; padding: 0; }
+  .quiz .q { margin: 1.2rem 0; }
+  .quiz .q p { font-weight: 600; }
+  .quiz label { display: block; margin: 0.35rem 0; padding: 0.45rem 0.7rem; border-radius: 4px; cursor: pointer; }
+  .quiz label:hover { background: #f5f7f9; }
+  .quiz input[type="radio"] { margin-right: 0.5rem; }
+  .quiz .check-btn {
+    margin-top: 1rem; padding: 0.55rem 1.5rem;
+    background: var(--accent); color: #fff; border: none; border-radius: 4px;
+    font-size: 0.95rem; cursor: pointer; font-family: "Noto Sans KR", sans-serif;
+  }
+  .quiz .check-btn:hover { opacity: 0.9; }
+  .quiz .feedback { margin-top: 0.8rem; font-weight: 600; min-height: 1.5em; color: var(--accent); }
+
+  .flow {
+    display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+    margin: 1.5rem 0; font-size: 0.9rem; font-family: "Noto Sans KR", sans-serif;
+  }
+  .flow .node {
+    background: #f0f4f8; padding: 0.5rem 0.8rem; border-radius: 4px;
+    border: 1px solid var(--line); white-space: nowrap;
+  }
+  .flow .arrow { color: var(--muted); }
+
+  .footnote { font-size: 0.85rem; color: var(--muted); margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+
+  .callout {
+    background: #fff8e1; border-left: 4px solid #f0a030;
+    padding: 0.8rem 1rem; margin: 1rem 0; font-size: 0.9rem;
+  }
+  .callout.warn { background: #ffeaea; border-left-color: var(--warn); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 0001</h1>
+<h1 style="font-weight:400; margin-top:-0.2rem;">Clean OS 이후 작업 순서</h1>
+
+<p class="meta">2026-06-17 · 소요시간 약 15분 · 연관: <a href="../GLOSSARY.md">GLOSSARY</a>, <a href="../MISSION.md">MISSION</a>, <a href="../RESOURCES.md">RESOURCES</a></p>
+
+<p>
+Ubuntu Server 24.04를 Dell R740xd에 새로 설치한 직후의 상태에서, Docker로 GPU 컨테이너를 실행할 수 있기까지의 <strong>작업 순서와 각 단계에서의 판단 기준</strong>을 다룹니다.
+</p>
+
+<p>
+이 수업이 끝나면 여러분은:
+</p>
+<ul style="margin-left:1.5rem;">
+  <li>각 설치 단계가 <strong>왜</strong> 그 순서여야 하는지 설명할 수 있습니다</li>
+  <li>에어갭 환경에서도 적용 가능한 설치 방법을 압니다</li>
+  <li>설치가 잘 되었는지 검증하는 테스트를 실행할 수 있습니다</li>
+</ul>
+
+---
+
+<h2>1. 현재 상태 확인</h2>
+
+<div class="state-box">
+  <span class="label">알고 있는 상태</span>
+  OS 설치 완료 · NVIDIA 드라이버 설치 완료 (<code>nvidia-smi</code> 동작) · <code>git</code> 설치됨 · <code>docker</code> 미설치
+</div>
+
+<p>
+  <code>nvidia-smi</code>로 확인할 항목들:
+</p>
+<pre><span class="prompt">$</span> <span class="cmd">nvidia-smi</span>
+<span class="prompt">$</span> <span class="cmd">nvidia-smi topo -m</span>    <span class="arg"># GPU 토폴로지: PCIe 경로 확인</span>
+<span class="prompt">$</span> <span class="cmd">git --version</span>           <span class="arg"># git 존재 확인</span>
+<span class="prompt">$</span> <span class="cmd">docker --version</span>        <span class="arg"># "command not found" 예상됨</span></pre>
+
+<div class="callout">
+<strong>GPU 토폴로지 확인 이유:</strong> PCIe 브릿지, GPU-RAID 컨트롤러 간 거리, NUMA 노드 바인딩을 미리 파악해야 Docker로 GPU를 할당할 때 최적 경로를 선택할 수 있습니다. 특히 A100 2장이 서로 다른 NUMA 노드에 있는지 확인하세요.
+</div>
+
+---
+
+<h2>2. 전체 작업 파이프라인</h2>
+
+<p>Clean OS에서 GPU 컨테이너 실행까지의 흐름입니다:</p>
+
+<div class="flow">
+  <span class="node">① APT 미러 설정</span>
+  <span class="arrow">→</span>
+  <span class="node">② Docker Engine 설치</span>
+  <span class="arrow">→</span>
+  <span class="node">③ NVIDIA Container Toolkit 설치</span>
+  <span class="arrow">→</span>
+  <span class="node">④ Docker GPU 런타임 설정</span>
+  <span class="arrow">→</span>
+  <span class="node">⑤ Private Registry 설정</span>
+  <span class="arrow">→</span>
+  <span class="node">⑥ GPU 컨테이너 테스트</span>
+</div>
+
+<div class="callout warn">
+<strong>순서가 중요한 이유:</strong> ③ NVIDIA Container Toolkit은 ② Docker Engine이 먼저 설치되어 있어야 합니다(NVIDIA Container Toolkit이 Docker의 런타임 경로에 자신을 등록하기 때문). 그리고 ⑥ 테스트는 ④⑤ 설정이 완료된 후에야 통과합니다. 순서를 바꾸면 재설치를 해야 할 수 있습니다.
+</div>
+
+---
+
+<h2>3. 각 단계 상세</h2>
+
+<ol class="steps">
+
+<li>
+<strong>APT 미러 설정</strong>
+<p>Ubuntu 24.04는 APT 소스 파일이 <code>/etc/apt/sources.list.d/ubuntu.sources</code> (DEB822 형식)로 관리됩니다. 내부망 APT 미러 주소로 변경합니다.</p>
+<pre><span class="prompt">$</span> <span class="cmd">sudo vim /etc/apt/sources.list.d/ubuntu.sources</span>
+<span class="arg"># 내부 미러 URL로 URIs 변경</span>
+<span class="prompt">$</span> <span class="cmd">sudo apt update</span></pre>
+<p><a href="https://documentation.ubuntu.com/server/how-to/software/mirrors/">Ubuntu 공식 미러 가이드 (참고용)</a></p>
+</li>
+
+<li>
+<strong>Docker Engine 설치</strong>
+<p>에어갭 환경에서는 Docker 공식 apt repo 대신, 패키지를 내부 미러에서 받아 설치합니다.</p>
+<pre><span class="prompt">$</span> <span class="cmd">sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin</span>
+<span class="prompt">$</span> <span class="cmd">sudo usermod -aG docker $USER</span>          <span class="arg"># sudo 없이 docker 명령 사용</span>
+<span class="prompt">$</span> <span class="cmd">docker --version</span></pre>
+<p>🔗 <em>주 출처: <a href="https://docs.docker.com/engine/install/ubuntu/">Docker 공식 — Ubuntu 설치 가이드</a></em></p>
+<div class="callout">
+<strong>sudo 없이 docker 실행하기:</strong> <code>usermod -aG docker</code> 후에 <strong>로그아웃 후 재로그인</strong>해야 그룹 변경이 적용됩니다. 재부팅 없이 적용하려면 <code>newgrp docker</code> 또는 <code>su - $USER</code>.
+</div>
+</li>
+
+<li>
+<strong>NVIDIA Container Toolkit 설치</strong>
+<p>NVIDIA 드라이버만으로는 Docker가 GPU에 접근할 수 없습니다. NVIDIA Container Toolkit이 드라이버와 Docker 사이의 다리 역할을 합니다.</p>
+<p>에어갭 환경: 내부 APT 미러에 <code>nvidia-container-toolkit</code> 패키지가 미러링되어 있어야 합니다. 없다면 관리자에게 요청하거나, <code>.deb</code> 파일을 수동으로 가져와 <code>dpkg -i</code>로 설치해야 합니다.</p>
+<pre><span class="prompt">$</span> <span class="cmd">sudo apt install nvidia-container-toolkit</span></pre>
+<p>🔗 <em>주 출처: <a href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html">NVIDIA Container Toolkit 공식 설치 가이드</a></em></p>
+<div class="callout warn">
+<strong>일반적인 실수:</strong> 드라이버(<code>nvidia-driver-550</code>)가 설치되어 있으면 GPU가 보이니까, Toolkit 없이도 Docker에서 GPU가 될 거라고 생각하기 쉽습니다. <strong>안 됩니다.</strong> Toolkit 없이 <code>docker run --gpus all</code>을 하면 "could not select device driver" 오류가 납니다.
+</div>
+</li>
+
+<li>
+<strong>Docker GPU 런타임 설정</strong>
+<p>NVIDIA Container Toolkit을 Docker의 런타임으로 등록합니다. 이 명령 한 줄로 <code>/etc/docker/daemon.json</code>에 NVIDIA 런타임이 자동 등록됩니다.</p>
+<pre><span class="prompt">$</span> <span class="cmd">sudo nvidia-ctk runtime configure --runtime=docker</span>
+<span class="prompt">$</span> <span class="cmd">sudo systemctl restart docker</span></pre>
+<p>설정 후 <code>/etc/docker/daemon.json</code>을 확인하면 <code>"runtimes": {"nvidia": {...}}</code> 항목이 추가된 것을 볼 수 있습니다.</p>
+</li>
+
+<li>
+<strong>Private Registry 설정</strong>
+<p>에어갭 환경에서는 모든 Docker 이미지를 내부 Registry에서 pull 받아야 합니다. <code>/etc/docker/daemon.json</code>에 registry mirror를 추가합니다.</p>
+<pre>{
+  <span class="arg">"registry-mirrors"</span>: [<span class="arg">"https://nexus.internal.company.com"</span>],
+  <span class="arg">"runtimes"</span>: {
+    <span class="arg">"nvidia"</span>: { ... }
+  }
+}</pre>
+<pre><span class="prompt">$</span> <span class="cmd">sudo systemctl restart docker</span></pre>
+<p>Nexus, Harbor 등 회사에서 사용 중인 Registry 주소로 설정하세요.</p>
+</li>
+
+<li>
+<strong>GPU 컨테이너 실행 테스트</strong>
+<p>가장 작은 CUDA 이미지로 GPU 접근을 검증합니다. <code>nvidia-smi</code>가 컨테이너 안에서도 동일하게 보여야 합니다.</p>
+<pre><span class="prompt">$</span> <span class="cmd">docker run --rm --gpus all nvidia/cuda:12.6-base nvidia-smi</span></pre>
+<p>출력에 A100 80GB × 2장이 보이면 성공입니다. 만약 이미지가 내부 Registry에 없다면 미리 <code>docker pull</code> 받아두세요.</p>
+<div class="callout">
+<strong>검증 체크리스트:</strong><br>
+✅ 컨테이너 안에서 <code>nvidia-smi</code>가 GPU 2장을 표시하는가<br>
+✅ 각 GPU의 메모리가 80GB로 인식되는가<br>
+✅ 드라이버 버전이 호스트와 동일한가<br>
+✅ <code>--gpus '"device=0"'</code>로 GPU 1장만 선택 가능한가
+</div>
+</li>
+
+</ol>
+
+---
+
+<h2>4. 다음 단계 미리보기</h2>
+
+<p>여기까지 완료되면, 여러분의 서버는 이 상태가 됩니다:</p>
+
+<div class="state-box">
+  <span class="label">Lesson 0001 완료 후 서버 상태</span>
+  OS ✅ · 드라이버 ✅ · Docker ✅ · NVIDIA Container Toolkit ✅ · Private Registry ✅ · GPU 컨테이너 실행 ✅
+</div>
+
+<p>다음 Lesson 0002에서는 이 GPU 컨테이너 위에서 <strong>디렉토리 구조 설계</strong>와 <strong>Docker Compose로 vLLM 첫 실행</strong>을 다룰 예정입니다.</p>
+
+---
+
+<h2>5. 복습 퀴즈</h2>
+
+<p style="color:var(--muted); font-size:0.9rem;">답을 선택한 후 "확인"을 누르면 즉시 피드백을 받습니다.</p>
+
+<div class="quiz" id="quiz">
+
+<div class="q" id="q1">
+  <p>Q1. Ubuntu 24.04에서 NVIDIA Container Toolkit보다 Docker Engine을 먼저 설치해야 하는 이유는?</p>
+  <label><input type="radio" name="q1" value="a"> NVIDIA Container Toolkit이 Docker 런타임 경로에 자신을 등록하기 때문</label>
+  <label><input type="radio" name="q1" value="b"> Docker Engine이 더 오래된 패키지라서 충돌을 피하기 위해</label>
+  <label><input type="radio" name="q1" value="c"> NVIDIA Container Toolkit이 Docker 바이너리를 직접 의존성으로 요구하기 때문</label>
+</div>
+
+<div class="q" id="q2">
+  <p>Q2. <code>nvidia-smi</code>가 호스트에서 동작하는데도 Docker에서 <code>--gpus all</code>이 실패하는 이유는?</p>
+  <label><input type="radio" name="q2" value="a"> Docker Engine 버전이 19.03 미만이라서 GPU 플래그를 지원하지 않음</label>
+  <label><input type="radio" name="q2" value="b"> NVIDIA 드라이버가 컨테이너 GPU 패스스루를 지원하지 않기 때문</label>
+  <label><input type="radio" name="q2" value="c"> NVIDIA Container Toolkit이 설치되지 않아서 Docker가 GPU에 접근할 다리가 없기 때문</label>
+</div>
+
+<div class="q" id="q3">
+  <p>Q3. <code>nvidia-ctk runtime configure --runtime=docker</code> 명령이 실제로 수정하는 파일은?</p>
+  <label><input type="radio" name="q3" value="a"> /etc/nvidia-container-runtime/config.toml</label>
+  <label><input type="radio" name="q3" value="b"> /usr/bin/nvidia-container-runtime</label>
+  <label><input type="radio" name="q3" value="c"> /etc/docker/daemon.json</label>
+</div>
+
+<button class="check-btn" onclick="checkQuiz()">정답 확인</button>
+<div class="feedback" id="feedback"></div>
+</div>
+
+<script>
+function checkQuiz() {
+  const answers = {
+    q1: 'a',
+    q2: 'c',
+    q3: 'c'
+  };
+  let correct = 0;
+  const total = 3;
+
+  for (let [q, correctVal] of Object.entries(answers)) {
+    const selected = document.querySelector(`input[name="${q}"]:checked`);
+    const labels = document.querySelectorAll(`#${q} label`);
+    labels.forEach(l => l.style.background = '');
+
+    if (selected && selected.value === correctVal) {
+      correct++;
+      selected.parentElement.style.background = '#e8f5e9';
+    } else if (selected) {
+      selected.parentElement.style.background = '#ffebee';
+      // highlight the correct one
+      const correctLabel = document.querySelector(`#${q} input[value="${correctVal}"]`).parentElement;
+      correctLabel.style.background = '#e8f5e9';
+    }
+  }
+
+  const fb = document.getElementById('feedback');
+  if (correct === total) {
+    fb.textContent = `✅ ${correct}/${total} — 전부 맞추셨습니다!`;
+    fb.style.color = '#2e7d32';
+  } else if (correct >= 2) {
+    fb.textContent = `🔶 ${correct}/${total} — 한 문제 틀렸습니다. 초록색 정답과 비교해보세요.`;
+    fb.style.color = '#e65100';
+  } else {
+    fb.textContent = `🔴 ${correct}/${total} — 다시 읽고 도전해보세요. 초록색이 정답입니다.`;
+    fb.style.color = '#c62828';
+  }
+}
+</script>
+
+---
+
+<div class="footnote">
+  <p><strong>🔗 추천 1차 자료:</strong> <a href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html">NVIDIA Container Toolkit 설치 가이드</a> — 이 수업의 ③④⑤ 단계의 공식 출처입니다.</p>
+  <p><strong>📎 참고 문서:</strong> <a href="../GLOSSARY.md">용어집</a> · <a href="../reference/0001-setup-cheatsheet.html">설치 치트시트</a> (준비 중)</p>
+  <p style="margin-top:1.2rem;">
+    <strong>💬 궁금한 점이 있다면 질문하세요.</strong> 이 에이전트는 여러분의 교사입니다. 이해되지 않는 부분, 더 깊게 알고 싶은 부분이 있다면 바로 물어보세요. &lt;— 이걸 연습하는 것도 GitOps 마인드셋의 일부입니다.
+  </p>
+</div>
+
+</body>
+</html>

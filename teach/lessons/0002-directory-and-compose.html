@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson 0002 — 디렉토리 구조 설계와 vLLM 첫 실행</title>
+<style>
+  :root { --text: #1a1a1a; --muted: #555; --bg: #fefefe; --accent: #2b5f8a; --warn: #c4422e; --line: #e0e0e0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Noto Serif KR", "Source Han Serif KR", Georgia, serif; line-height: 1.7; color: var(--text); background: var(--bg); max-width: 800px; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; font-size: 17px; }
+  h1, h2, h3 { font-family: "Noto Sans KR", "Source Han Sans KR", -apple-system, sans-serif; }
+  h1 { font-size: 2.2rem; margin-bottom: 0.3rem; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 1.3rem; margin: 2.5rem 0 0.8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); font-weight: 600; }
+  h3 { font-size: 1.0rem; margin: 1.5rem 0 0.4rem; font-weight: 600; }
+  p { margin: 0.7rem 0; }
+  .meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); }
+  a:hover { border-bottom-color: var(--accent); }
+
+  .state-box { background: #f5f7f9; border-left: 4px solid var(--accent); padding: 1rem 1.2rem; margin: 1.5rem 0; font-size: 0.95rem; }
+  .state-box .label { font-weight: 700; color: var(--accent); display: block; margin-bottom: 0.3rem; }
+
+  .dirtree { background: #f8f9fa; padding: 1.2rem 1.5rem; margin: 1.2rem 0; border-radius: 6px; font-family: "JetBrains Mono", "D2Coding", "Consolas", monospace; font-size: 0.85rem; line-height: 1.8; }
+  .dirtree .comment { color: #6a737d; }
+  .dirtree .dir { color: var(--accent); font-weight: 600; }
+  .dirtree .file { color: #333; }
+  .dirtree .git { color: #999; }
+
+  .table-wrap { overflow-x: auto; margin: 1rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { border: 1px solid var(--line); padding: 0.5rem 0.8rem; text-align: left; vertical-align: top; }
+  th { background: #f5f7f9; font-weight: 600; }
+  tr:hover td { background: #fafbfc; }
+
+  pre { background: #1e1e1e; color: #d4d4d4; padding: 1rem 1.2rem; margin: 0.8rem 0; border-radius: 4px; overflow-x: auto; font-size: 0.83rem; line-height: 1.6; font-family: "JetBrains Mono", "D2Coding", "Consolas", monospace; }
+  pre .p { color: #6a9955; }
+  pre .c { color: #ce9178; }
+  pre .k { color: #569cd6; }
+  pre .s { color: #d7ba7d; }
+  code { background: #f0f0f0; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.9em; }
+
+  .callout { background: #fff8e1; border-left: 4px solid #f0a030; padding: 0.8rem 1rem; margin: 1rem 0; font-size: 0.9rem; }
+  .callout.warn { background: #ffeaea; border-left-color: var(--warn); }
+  .callout.info { background: #e8f0fe; border-left-color: var(--accent); }
+
+  .quiz { margin: 2rem 0; padding: 1.5rem; border: 1px solid var(--line); border-radius: 6px; }
+  .quiz h3 { margin-top: 0; border: none; padding: 0; }
+  .quiz .q { margin: 1.2rem 0; }
+  .quiz .q > p { font-weight: 600; }
+  .quiz label { display: block; margin: 0.35rem 0; padding: 0.45rem 0.7rem; border-radius: 4px; cursor: pointer; }
+  .quiz label:hover { background: #f5f7f9; }
+  .quiz input[type="radio"] { margin-right: 0.5rem; }
+  .quiz .check-btn { margin-top: 1rem; padding: 0.55rem 1.5rem; background: var(--accent); color: #fff; border: none; border-radius: 4px; font-size: 0.95rem; cursor: pointer; font-family: "Noto Sans KR", sans-serif; }
+  .quiz .check-btn:hover { opacity: 0.9; }
+  .quiz .feedback { margin-top: 0.8rem; font-weight: 600; min-height: 1.5em; color: var(--accent); }
+
+  .footnote { font-size: 0.85rem; color: var(--muted); margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<h1>Lesson 0002</h1>
+<h1 style="font-weight:400; margin-top:-0.2rem;">디렉토리 구조 설계와 vLLM 첫 실행</h1>
+<p class="meta">2026-06-18 · 소요시간 약 15분 · ← <a href="0001-clean-os-setup-sequence.html">Lesson 0001</a> · <a href="../GLOSSARY.md">GLOSSARY</a> · <a href="../MISSION.md">MISSION</a></p>
+
+<p>
+  Lesson 0001에서 서버에 Docker + NVIDIA Container Toolkit이 설치되었습니다. 이제 <strong>어디에 무엇을 둘 것인지</strong>를 결정하고, 실제로 <strong>vLLM 컨테이너를 실행</strong>해봅니다.
+</p>
+
+<p>이 수업이 끝나면:</p>
+<ul style="margin-left:1.5rem;">
+  <li>여러분 서버의 디렉토리 구조가 결정됩니다</li>
+  <li>Docker Compose 파일이 무엇이고 왜 쓰는지 설명할 수 있습니다</li>
+  <li>vLLM 컨테이너를 GPU 0번에서 실행할 수 있습니다</li>
+</ul>
+
+---
+
+<h2>1. 디렉토리 구조 — 왜 먼저 설계해야 하는가</h2>
+
+<div class="callout info">
+  <strong>핵심 원칙:</strong> Git으로 추적할 것(설정)과 Git으로 추적하지 않을 것(모델, 캐시, 시크릿)을 분리하는 것. 이것이 Git-first 워크플로우의 물리적 기반입니다.
+</div>
+
+<p>Git 저장소 하나가 하나의 "실험 프로젝트"가 됩니다. 다음과 같은 구조를 권장합니다:</p>
+
+<div class="dirtree">
+<span class="dir">~/vllm-experiments/</span>              <span class="comment">← Git 저장소 루트</span><br>
+├── <span class="file">run.sh</span>                          <span class="comment">← vLLM 실행 명령 (실험 설정 = 이 파일)</span><br>
+├── <span class="file">compose.yaml</span>                    <span class="comment">← Docker Compose 정의</span><br>
+├── <span class="git">.env</span>                            <span class="comment">← HF_TOKEN 등 시크릿 (Git 추적 ❌)</span><br>
+├── <span class="git">.gitignore</span>                       <span class="comment">← Git 제외 규칙</span><br>
+├── <span class="dir">models/</span>                          <span class="comment">← Hugging Face 모델 캐시 (Git 추적 ❌)</span><br>
+├── <span class="dir">results/</span>                         <span class="comment">← 실험 결과·로그 (선택적 Git 추적)</span><br>
+└── <span class="file">README.md</span>                       <span class="comment">← 실험 노트</span>
+</div>
+
+<h3>각 디렉토리/파일의 역할</h3>
+
+<div class="table-wrap">
+<table>
+  <tr><th>항목</th><th>Git?</th><th>역할</th></tr>
+  <tr><td><code>run.sh</code></td><td>✅</td><td><strong>실험 설정의 단일 진실 공급원.</strong> 모델명, TP 크기, 메모리 제한 등 vLLM 실행 인자를 이 파일 하나에 담습니다. <code>git log</code>가 곧 실험 이력이 됩니다.</td></tr>
+  <tr><td><code>compose.yaml</code></td><td>✅</td><td>컨테이너의 <strong>선언적 정의</strong>. 어떤 이미지, 어떤 포트, 어떤 볼륨, 어떤 GPU를 쓸지 명시합니다. 한 번 작성하면 잘 바뀌지 않습니다.</td></tr>
+  <tr><td><code>.env</code></td><td>❌</td><td>Git에 절대 커밋하지 않을 값들. 토큰, 비밀번호. <code>.gitignore</code>에 반드시 등록.</td></tr>
+  <tr><td><code>models/</code></td><td>❌</td><td>다운로드된 모델 파일. 수십 GB 단위라 Git에 넣을 수 없습니다. 컨테이너에 volume mount로 제공.</td></tr>
+  <tr><td><code>results/</code></td><td>△</td><td>실험 메트릭·로그. 작은 텍스트 파일이면 Git에 넣고, 큰 바이너리면 제외.</td></tr>
+</table>
+</div>
+
+<div class="callout">
+  <strong>Lesson 0001과의 연결:</strong> Lesson 0001에서 Docker를 설치할 때 <code>sudo usermod -aG docker $USER</code>를 실행했습니다. 이 디렉토리는 <code>$USER</code> 홈 아래에 만드세요. Docker 컨테이너가 이 경로를 volume mount로 접근하게 됩니다.
+</div>
+
+---
+
+<h2>2. Docker Compose — 컨테이너를 선언적으로 정의하기</h2>
+
+<p>
+  Docker Compose는 <strong>"컨테이너가 이렇게 생겨야 한다"</strong>를 YAML 파일 하나에 적는 도구입니다.
+  Lesson 0001에서 배운 <code>docker run --gpus all ...</code> 명령어를 기억하시나요?
+  그 긴 명령어를 <code>compose.yaml</code> 파일로 옮겨놓은 것이라 생각하면 됩니다.
+</p>
+
+<p>GitOps 관점에서 Compose는 완벽한 짝입니다:</p>
+<ul style="margin-left:1.5rem;">
+  <li><strong>선언적(Declarative):</strong> "GPU 0번에 이 이미지로, 이 포트로, 이 모델을 띄워라" — what을 기술</li>
+  <li><strong>버전 관리:</strong> <code>compose.yaml</code>이 Git에 들어가므로, 누가 언제 어떤 설정을 바꿨는지 추적 가능</li>
+</ul>
+
+<h3>vLLM용 compose.yaml — 실전 예제</h3>
+
+<pre><span class="c"># compose.yaml — Git-first vLLM 실험</span>
+<span class="k">services</span>:
+  <span class="c">vllm-dev</span>:
+    <span class="k">image</span>: <span class="s">nexus.internal.company.com/vllm/vllm-openai:v0.7.1</span>
+    <span class="k">container_name</span>: <span class="s">vllm-dev</span>
+
+    <span class="c"># GPU 설정</span>
+    <span class="k">deploy</span>:
+      <span class="k">resources</span>:
+        <span class="k">reservations</span>:
+          <span class="k">devices</span>:
+            - <span class="k">driver</span>: <span class="s">nvidia</span>
+              <span class="k">count</span>: <span class="s">1</span>
+              <span class="k">capabilities</span>: [<span class="s">gpu</span>]
+
+    <span class="c"># GPU 0번만 사용</span>
+    <span class="k">environment</span>:
+      - <span class="s">NVIDIA_VISIBLE_DEVICES=0</span>
+      - <span class="s">HF_TOKEN=${HF_TOKEN}</span>
+
+    <span class="c"># 포트</span>
+    <span class="k">ports</span>:
+      - <span class="s">"8000:8000"</span>
+
+    <span class="c"># 볼륨 마운트</span>
+    <span class="k">volumes</span>:
+      - <span class="s">./models:/root/.cache/huggingface</span>
+      - <span class="s">./results:/workspace/results</span>
+
+    <span class="c"># 공유 메모리 (GPU 추론 필수)</span>
+    <span class="k">shm_size</span>: <span class="s">"2gb"</span>
+
+    <span class="c"># vLLM 실행 명령 — 이 부분을 run.sh로 추출</span>
+    <span class="k">command</span>: >
+      --model meta-llama/Llama-3.1-8B-Instruct
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.90
+      --max-model-len 8192
+      --dtype bfloat16
+      --host 0.0.0.0
+      --port 8000
+      --enforce-eager</pre>
+
+<p>
+  🔗 <em>주 출처: <a href="https://docs.docker.com/compose/how-tos/gpu-support/">Docker 공식 — Compose GPU 지원</a>, <a href="https://docs.vllm.ai/en/latest/serving/openai_compatible_server/">vLLM 공식 — OpenAI 호환 서버</a></em>
+</p>
+
+---
+
+<h2>3. compose.yaml의 6가지 핵심 요소 해설</h2>
+
+<div class="table-wrap">
+<table>
+  <tr><th>요소</th><th>무엇을 결정하는가</th><th>이 프로젝트에서의 선택</th></tr>
+  <tr>
+    <td><code>image</code></td>
+    <td>어떤 Docker 이미지를 쓸지</td>
+    <td>내부 Nexus에 미러링된 vLLM 이미지. 버전 태그(<code>:v0.7.1</code>)를 <strong>반드시 명시</strong>해야 재현성 확보.</td>
+  </tr>
+  <tr>
+    <td><code>deploy → devices</code></td>
+    <td>GPU를 컨테이너에 어떻게 연결할지</td>
+    <td><code>driver: nvidia</code>, <code>count: 1</code>로 GPU 1장 할당. Lesson 0001의 <code>--gpus</code> 플래그와 동일한 효과.</td>
+  </tr>
+  <tr>
+    <td><code>NVIDIA_VISIBLE_DEVICES</code></td>
+    <td><strong>어떤</strong> GPU를 쓸지</td>
+    <td><code>0</code> → GPU 0번만. 나중에 ops용으로 GPU 1번은 따로 컨테이너 띄움. 이 값만 바꾸면 GPU 할당 변경.</td>
+  </tr>
+  <tr>
+    <td><code>ports</code></td>
+    <td>호스트:컨테이너 포트 매핑</td>
+    <td>호스트 8000 → 컨테이너 8000. 팀원들이 <code>http://서버IP:8000</code>으로 API 호출 가능.</td>
+  </tr>
+  <tr>
+    <td><code>volumes</code></td>
+    <td>호스트 디렉토리를 컨테이너에 연결</td>
+    <td>모델 캐시(<code>./models</code>)와 결과(<code>./results</code>)를 컨테이너 내부와 공유. 컨테이너를 지워도 데이터 보존.</td>
+  </tr>
+  <tr>
+    <td><code>command</code></td>
+    <td>컨테이너가 실행할 명령</td>
+    <td>vLLM 서버 기동 명령. <strong>이 부분이 실험마다 바뀌는 영역</strong> — 그래서 <code>run.sh</code>로 분리함.</td>
+  </tr>
+</table>
+</div>
+
+---
+
+<h2>4. Volume Mount — 모델 캐시의 생명주기</h2>
+
+<p>이 부분을 제대로 이해하지 못하면 컨테이너를 재시작할 때마다 모델을 다시 다운로드하게 됩니다. 에어갭 환경에서는 HF Mirror에서 다시 받아야 하니 특히 중요합니다.</p>
+
+<h3>Volume Mount의 동작 방식</h3>
+
+<pre>호스트:  ./models/  ────────────마운트────────────▶  컨테이너: /root/.cache/huggingface/
+          (실제 물리 디스크)                              (컨테이너가 보는 가상 경로)</pre>
+
+<p>컨테이너 안에서 <code>/root/.cache/huggingface/hub/</code>에 모델 파일을 쓰면, 실제로는 <strong>호스트의 <code>./models/hub/</code></strong>에 저장됩니다. 컨테이너가 삭제되어도 호스트 디스크의 파일은 그대로 남습니다.</p>
+
+<div class="callout info">
+  <strong>왜 ./models 를 Git에 넣지 않나요?</strong><br>
+  Llama-3.1-8B-Instruct 하나가 약 16GB입니다. Git은 대용량 바이너리를 다루도록 설계되지 않았습니다. 모델 파일은 컨테이너의 볼륨 마운트로 관리하고, Git에는 "어떤 모델을 썼는지"(<code>run.sh</code>의 <code>MODEL</code> 변수)만 기록합니다.
+</div>
+
+---
+
+<h2>5. run.sh — 실험 설정의 단일 파일</h2>
+
+<p>
+  <code>compose.yaml</code>은 인프라 정의(고정), <code>run.sh</code>는 실험 설정(변동)입니다. 이 분리가 Git-first 실험의 핵심입니다.
+  <code>run.sh</code> 하나만 수정해서 커밋하면, 그것이 곧 하나의 실험 기록이 됩니다.
+</p>
+
+<pre><span class="p">#!/bin/bash</span>
+<span class="c"># run.sh — vLLM 실험 설정</span>
+<span class="c"># 이 파일을 수정 → git commit → git push → 자동 실행 (Lesson 0004 예정)</span>
+
+<span class="c"># === 실험 변수 (여기만 바꾸세요) ===</span>
+<span class="k">MODEL</span>=<span class="s">"meta-llama/Llama-3.1-8B-Instruct"</span>
+<span class="k">TP_SIZE</span>=<span class="s">1</span>
+<span class="k">MAX_MODEL_LEN</span>=<span class="s">8192</span>
+<span class="k">GPU_MEM_UTIL</span>=<span class="s">0.90</span>
+<span class="k">DTYPE</span>=<span class="s">"bfloat16"</span>
+
+<span class="c"># === 실행 (이 아래는 바꾸지 마세요) ===</span>
+docker compose up -d</pre>
+
+<p>
+  <code>docker compose up -d</code> 한 줄이 compose.yaml을 읽어 컨테이너를 백그라운드(<code>-d</code>)로 실행합니다.
+  컨테이너가 이미 떠 있으면 설정 변경사항을 반영해 재시작합니다.
+</p>
+
+---
+
+<h2>6. vLLM 핵심 인자 — 처음 알아야 할 5개</h2>
+
+<p>vLLM에는 수십 개의 옵션이 있지만, 실험의 출발점은 이 5개입니다:</p>
+
+<div class="table-wrap">
+<table>
+  <tr><th>인자</th><th>의미</th><th>기본값</th><th>실험 포인트</th></tr>
+  <tr>
+    <td><code>--tensor-parallel-size</code></td>
+    <td>모델을 몇 개의 GPU에 나눌지</td>
+    <td><code>1</code></td>
+    <td>NVLink 없으면 <strong>무조건 1</strong>. 2로 하면 PCIe 병목으로 오히려 느려짐</td>
+  </tr>
+  <tr>
+    <td><code>--gpu-memory-utilization</code></td>
+    <td>GPU 메모리의 몇 %까지 모델에 할당할지</td>
+    <td><code>0.90</code></td>
+    <td>0.85~0.95 사이. 너무 높으면 OOM, 너무 낮으면 KV Cache 공간 부족</td>
+  </tr>
+  <tr>
+    <td><code>--max-model-len</code></td>
+    <td>처리할 최대 컨텍스트 길이(토큰)</td>
+    <td>모델 기본값</td>
+    <td>값이 클수록 더 많은 VRAM 사용. 작게 시작해서 점진적 증가</td>
+  </tr>
+  <tr>
+    <td><code>--dtype</code></td>
+    <td>추론 정밀도</td>
+    <td><code>"auto"</code></td>
+    <td>A100에서는 <code>bfloat16</code>이 기본. <code>float16</code>과 속도/메모리 차이 비교해볼 만함</td>
+  </tr>
+  <tr>
+    <td><code>--enforce-eager</code></td>
+    <td>CUDA Graph 비활성화</td>
+    <td>비활성(그래프 사용)</td>
+    <td>첫 실행 시 CUDA Graph 오류가 나면 이 플래그 추가. 안정성 ↑, 약간의 성능 ↓</td>
+  </tr>
+</table>
+</div>
+
+<div class="callout warn">
+  <strong>TP=1이 핵심입니다.</strong> NVLink 없는 PCIe 환경에서 <code>--tensor-parallel-size 2</code>를 주면, GPU 간 데이터 전송이 PCIe(32GB/s)로 이루어져 <strong>단일 GPU보다 느려집니다</strong>. NVLink는 600GB/s입니다.
+</div>
+
+---
+
+<h2>7. 첫 실행 — 실제 워크플로우</h2>
+
+<pre><span class="c"># 1. 디렉토리 생성</span>
+<span class="p">mkdir -p ~/vllm-experiments/{models,results}</span>
+<span class="p">cd ~/vllm-experiments</span>
+
+<span class="c"># 2. compose.yaml 작성 (위 예제 복사)</span>
+<span class="p">vim compose.yaml</span>
+
+<span class="c"># 3. .env 파일에 HF_TOKEN 설정 (에어갭: HF Mirror 토큰)</span>
+<span class="p">echo 'HF_TOKEN=your_token_here' > .env</span>
+
+<span class="c"># 4. .gitignore 생성</span>
+<span class="p">echo '.env' > .gitignore</span>
+<span class="p">echo 'models/' >> .gitignore</span>
+
+<span class="c"># 5. 컨테이너 실행</span>
+<span class="p">docker compose up -d</span>
+
+<span class="c"># 6. 로그 확인 (모델 로딩 1~3분 소요)</span>
+<span class="p">docker compose logs -f</span>
+
+<span class="c"># 7. API 테스트</span>
+<span class="p">curl http://localhost:8000/v1/models</span></pre>
+
+<div class="callout">
+  <strong>에어갭 환경 특이사항:</strong> compose.yaml의 <code>image</code>는 Nexus 내부 주소. 모델 다운로드 경로도 HF Mirror를 바라보도록 <code>HF_ENDPOINT</code> 환경변수가 필요할 수 있습니다. 여러분의 Mirror 주소를 확인하세요: <code>echo 'HF_ENDPOINT=https://hf-mirror.internal.company.com' >> .env</code>
+</div>
+
+---
+
+<h2>8. Lesson 0001과의 전체 연결</h2>
+
+<p>지금까지의 과정을 하나의 파이프라인으로 보면:</p>
+
+<div class="state-box">
+  <strong style="font-size:1.05rem;">Lesson 0001 → 0002 파이프라인</strong><br><br>
+  ① Clean OS<br>
+  &nbsp;&nbsp;&nbsp;↓<br>
+  ② NVIDIA Driver + Docker + Container Toolkit<br>
+  &nbsp;&nbsp;&nbsp;↓<br>
+  ③ <strong>디렉토리 구조 설계 (이번 Lesson)</strong><br>
+  &nbsp;&nbsp;&nbsp;↓<br>
+  ④ <strong>compose.yaml 작성 (이번 Lesson)</strong><br>
+  &nbsp;&nbsp;&nbsp;↓<br>
+  ⑤ <strong>docker compose up -d → vLLM 실행 (이번 Lesson)</strong><br>
+  &nbsp;&nbsp;&nbsp;↓<br>
+  ⑥ curl로 API 확인<br><br>
+  <em>다음 Lesson 0003: GPU 0(Dev) / GPU 1(Ops) 분리 전략</em>
+</div>
+
+---
+
+<h2>9. 복습 퀴즈</h2>
+
+<div class="quiz" id="quiz">
+
+<div class="q" id="q1">
+  <p>Q1. <code>compose.yaml</code>의 <code>deploy.resources.reservations.devices</code> 섹션이 하는 일은?</p>
+  <label><input type="radio" name="q1" value="a"> 컨테이너에 GPU를 할당하는 선언적 방법 (Lesson 0001의 --gpus 플래그와 동일)</label>
+  <label><input type="radio" name="q1" value="b"> 호스트의 NVIDIA 드라이버를 컨테이너 안에 복사하는 명령</label>
+  <label><input type="radio" name="q1" value="c"> GPU 메모리 사용량을 모니터링하는 헬스체크 설정</label>
+</div>
+
+<div class="q" id="q2">
+  <p>Q2. 모델 캐시 디렉토리(<code>./models</code>)를 Volume Mount로 연결하는 결정적 이유는?</p>
+  <label><input type="radio" name="q2" value="a"> Git으로 모델 파일을 버전 관리하기 편리해지기 때문</label>
+  <label><input type="radio" name="q2" value="b"> 컨테이너가 삭제되어도 다운로드한 모델이 호스트 디스크에 보존되기 때문</label>
+  <label><input type="radio" name="q2" value="c"> Docker Hub에서 모델을 자동으로 다운로드받기 위함</label>
+</div>
+
+<div class="q" id="q3">
+  <p>Q3. NVLink가 없는 A100 2장 환경에서 <code>--tensor-parallel-size 2</code>가 오히려 느린 이유는?</p>
+  <label><input type="radio" name="q3" value="a"> A100 PCIe 버전은 TP 연산 자체를 지원하지 않아서 CPU로 폴백됨</label>
+  <label><input type="radio" name="q3" value="b"> GPU 간 데이터 전송이 PCIe(32GB/s)로 제한되어, NVLink(600GB/s) 대비 병목이 발생하기 때문</label>
+  <label><input type="radio" name="q3" value="c"> TP2는 두 GPU의 VRAM을 합쳐야 해서 80GB를 초과하면 디스크 스왑이 발생함</label>
+</div>
+
+<button class="check-btn" onclick="checkQuiz()">정답 확인</button>
+<div class="feedback" id="feedback"></div>
+</div>
+
+<script>
+function checkQuiz() {
+  const answers = { q1: 'a', q2: 'b', q3: 'b' };
+  let correct = 0;
+  const total = 3;
+
+  for (let [q, cv] of Object.entries(answers)) {
+    const sel = document.querySelector(`input[name="${q}"]:checked`);
+    document.querySelectorAll(`#${q} label`).forEach(l => l.style.background = '');
+
+    if (sel && sel.value === cv) {
+      correct++;
+      sel.parentElement.style.background = '#e8f5e9';
+    } else if (sel) {
+      sel.parentElement.style.background = '#ffebee';
+      document.querySelector(`#${q} input[value="${cv}"]`).parentElement.style.background = '#e8f5e9';
+    }
+  }
+
+  const fb = document.getElementById('feedback');
+  if (correct === total) {
+    fb.textContent = `✅ ${correct}/${total} — 전부 맞추셨습니다!`;
+    fb.style.color = '#2e7d32';
+  } else if (correct >= 2) {
+    fb.textContent = `🔶 ${correct}/${total} — 초록색 정답과 비교해보세요.`;
+    fb.style.color = '#e65100';
+  } else {
+    fb.textContent = `🔴 ${correct}/${total} — 다시 읽고 도전해보세요. 초록색이 정답입니다.`;
+    fb.style.color = '#c62828';
+  }
+}
+</script>
+
+---
+
+<div class="footnote">
+  <p><strong>🔗 추천 1차 자료:</strong> <a href="https://docs.vllm.ai/en/latest/serving/openai_compatible_server/">vLLM 공식 문서 — OpenAI Compatible Server</a> — 이 수업에서 다룬 모든 vLLM 인자의 공식 출처입니다.</p>
+  <p><strong>📎 참고 문서:</strong> <a href="../GLOSSARY.md">용어집</a> · <a href="0001-clean-os-setup-sequence.html">Lesson 0001</a></p>
+  <p style="margin-top:1.2rem;">
+    <strong>💬 궁금한 점이 있다면 질문하세요.</strong> 이 에이전트는 여러분의 교사입니다. compose.yaml의 각 섹션이 왜 그렇게 쓰였는지, vLLM 인자 하나하나가 무슨 의미인지 — 이해되지 않는 부분은 바로 물어보세요.
+  </p>
+</div>
+
+</body>
+</html>

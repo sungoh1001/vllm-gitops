@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reference 0002 — compose.yaml + run.sh 템플릿</title>
+<style>
+  :root { --text: #1a1a1a; --muted: #555; --bg: #fefefe; --accent: #2b5f8a; --line: #e0e0e0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Noto Sans KR", "Source Han Sans KR", -apple-system, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); max-width: 800px; margin: 0 auto; padding: 1.5rem; font-size: 14px; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+  h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+  .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+  pre { background: #1e1e1e; color: #d4d4d4; padding: 0.6rem 0.9rem; margin: 0.5rem 0; border-radius: 4px; font-size: 0.82rem; line-height: 1.55; overflow-x: auto; }
+  code { background: #f0f0f0; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.9em; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--line); padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
+  th { background: #f5f7f9; font-weight: 600; }
+  a { color: var(--accent); }
+  @media print { body { max-width: 100%; padding: 0.5in; font-size: 11px; } pre { font-size: 9px; } }
+</style>
+</head>
+<body>
+
+<h1>Reference 0002</h1>
+<h1 style="font-weight:400; margin-top:-0.2rem;">compose.yaml + run.sh 템플릿</h1>
+<p class="meta">연관 수업: <a href="../lessons/0002-directory-and-compose.html">Lesson 0002</a> · 인쇄용 · 갱신: 2026-06-18</p>
+
+<h2>디렉토리 구조</h2>
+<pre>~/vllm-experiments/
+├── run.sh              ← 실험 설정 (수정 대상)
+├── compose.yaml        ← 컨테이너 정의 (고정)
+├── .env                ← HF_TOKEN (Git ❌)
+├── .gitignore
+├── models/             ← 모델 캐시 (Git ❌)
+└── results/            ← 실험 결과</pre>
+
+<h2>compose.yaml (템플릿)</h2>
+<pre>services:
+  vllm-dev:
+    image: nexus.internal.company.com/vllm/vllm-openai:v0.7.1
+    container_name: vllm-dev
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=0
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_ENDPOINT=https://hf-mirror.internal.company.com
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/root/.cache/huggingface
+      - ./results:/workspace/results
+    shm_size: "2gb"
+    command: >
+      --model ${MODEL}
+      --tensor-parallel-size ${TP_SIZE}
+      --gpu-memory-utilization ${GPU_MEM_UTIL}
+      --max-model-len ${MAX_MODEL_LEN}
+      --dtype ${DTYPE}
+      --host 0.0.0.0
+      --port 8000</pre>
+
+<h2>run.sh (템플릿)</h2>
+<pre>#!/bin/bash
+# === 실험 설정 (여기만 수정) ===
+MODEL="meta-llama/Llama-3.1-8B-Instruct"
+TP_SIZE=1
+MAX_MODEL_LEN=8192
+GPU_MEM_UTIL=0.90
+DTYPE="bfloat16"
+
+# 환경변수 로드
+set -a; source .env; set +a
+
+# 실행
+docker compose up -d</pre>
+
+<h2>vLLM 핵심 인자 참고</h2>
+<table>
+  <tr><th>인자</th><th>의미</th><th>권장값</th></tr>
+  <tr><td><code>--tensor-parallel-size</code></td><td>GPU 분할 개수</td><td>A100 PCIe: <strong>1</strong> (NVLink 없음)</td></tr>
+  <tr><td><code>--gpu-memory-utilization</code></td><td>VRAM 사용률</td><td>0.85 ~ 0.95</td></tr>
+  <tr><td><code>--max-model-len</code></td><td>최대 컨텍스트 길이</td><td>8192 → 16384 → 32768 순차 실험</td></tr>
+  <tr><td><code>--dtype</code></td><td>추론 정밀도</td><td><code>bfloat16</code> (A100 네이티브)</td></tr>
+  <tr><td><code>--enforce-eager</code></td><td>CUDA Graph 비활성</td><td>오류 시에만 추가</td></tr>
+</table>
+
+<h2>자주 쓰는 명령어</h2>
+<pre>docker compose up -d          # 컨테이너 시작 (백그라운드)
+docker compose logs -f        # 로그 실시간 확인
+docker compose down           # 컨테이너 정지 + 삭제
+docker compose restart        # 컨테이너 재시작
+curl localhost:8000/v1/models # API 확인</pre>
+
+</body>
+</html>

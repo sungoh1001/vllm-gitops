@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reference 0001 — Clean OS → GPU 컨테이너 설치 치트시트</title>
+<style>
+  :root { --text: #1a1a1a; --muted: #555; --bg: #fefefe; --accent: #2b5f8a; --line: #e0e0e0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: "Noto Sans KR", "Source Han Sans KR", -apple-system, sans-serif; line-height: 1.6; color: var(--text); background: var(--bg); max-width: 800px; margin: 0 auto; padding: 1.5rem; font-size: 14px; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+  h2 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; padding-top: 0.8rem; border-top: 1px solid var(--line); }
+  .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+  pre { background: #1e1e1e; color: #d4d4d4; padding: 0.6rem 0.9rem; margin: 0.5rem 0; border-radius: 4px; font-size: 0.82rem; line-height: 1.55; overflow-x: auto; }
+  code { background: #f0f0f0; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.9em; }
+  table { border-collapse: collapse; width: 100%; margin: 0.8rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid var(--line); padding: 0.45rem 0.7rem; text-align: left; }
+  th { background: #f5f7f9; font-weight: 600; }
+  @media print { body { max-width: 100%; padding: 0.5in; font-size: 11px; } pre { font-size: 9px; } }
+</style>
+</head>
+<body>
+
+<h1>Reference 0001</h1>
+<h1 style="font-weight:400; margin-top:-0.2rem;">Clean OS → GPU 컨테이너 설치 치트시트</h1>
+<p class="meta">연관 수업: Lesson 0001 · 인쇄용 · 마지막 갱신: 2026-06-17</p>
+
+<h2>작업 순서</h2>
+<table>
+  <tr><th>#</th><th>단계</th><th>핵심 명령어</th><th>검증</th></tr>
+  <tr><td>1</td><td>APT 미러</td><td><code>sudo vim /etc/apt/sources.list.d/ubuntu.sources</code><br><code>sudo apt update</code></td><td><code>apt update</code> 성공</td></tr>
+  <tr><td>2</td><td>Docker Engine</td><td><code>sudo apt install docker-ce docker-ce-cli containerd.io docker-compose-plugin</code><br><code>sudo usermod -aG docker $USER</code></td><td><code>docker --version</code></td></tr>
+  <tr><td>3</td><td>NVIDIA CTK</td><td><code>sudo apt install nvidia-container-toolkit</code></td><td><code>nvidia-ctk --version</code></td></tr>
+  <tr><td>4</td><td>GPU 런타임 등록</td><td><code>sudo nvidia-ctk runtime configure --runtime=docker</code><br><code>sudo systemctl restart docker</code></td><td><code>cat /etc/docker/daemon.json</code> 에 nvidia 런타임 존재</td></tr>
+  <tr><td>5</td><td>Private Registry</td><td><code>/etc/docker/daemon.json</code>에 <code>"registry-mirrors"</code> 추가<br><code>sudo systemctl restart docker</code></td><td><code>docker info</code> 에 Registry Mirrors 표시</td></tr>
+  <tr><td>6</td><td>GPU 컨테이너 테스트</td><td><code>docker run --rm --gpus all nvidia/cuda:12.6-base nvidia-smi</code></td><td>컨테이너 안에서 A100 출력</td></tr>
+</table>
+
+<h2>핵심 파일</h2>
+<table>
+  <tr><th>파일</th><th>역할</th></tr>
+  <tr><td><code>/etc/apt/sources.list.d/ubuntu.sources</code></td><td>APT 패키지 소스 (Ubuntu 24.04 DEB822 포맷)</td></tr>
+  <tr><td><code>/etc/docker/daemon.json</code></td><td>Docker 데몬 설정 — 런타임, 레지스트리 미러</td></tr>
+  <tr><td><code>/etc/nvidia-container-runtime/config.toml</code></td><td>NVIDIA Container Runtime 세부 설정(일반적으로 직접 편집 불필요)</td></tr>
+</table>
+
+<h2>일반적인 오류</h2>
+<table>
+  <tr><th>오류 메시지</th><th>원인</th><th>해결</th></tr>
+  <tr><td><code>could not select device driver</code></td><td>NVIDIA Container Toolkit 미설치</td><td>3단계 설치</td></tr>
+  <tr><td><code>permission denied</code> (docker 명령)</td><td>docker 그룹 미가입</td><td><code>sudo usermod -aG docker $USER</code> 후 재로그인</td></tr>
+  <tr><td><code>manifest unknown</code></td><td>이미지가 Registry에 없음</td><td>Registry에서 이미지 pull 또는 미러링</td></tr>
+</table>
+
+</body>
+</html>
